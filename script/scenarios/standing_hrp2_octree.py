@@ -30,7 +30,7 @@ rLeg = 'RLEG_JOINT0'
 rLegOffset = [0,-0.105,0,]
 rLegNormal = [0,1,0]
 rLegx = 0.09; rLegy = 0.05
-fullBody.addLimb(rLegId,rLeg,'',rLegOffset,rLegNormal, rLegx, rLegy, 10000, "EFORT", 0.1)
+fullBody.addLimb(rLegId,rLeg,'',rLegOffset,rLegNormal, rLegx, rLegy, 10000, "EFORT", 0.01)
 
 lLegId = '1LL'
 lLeg = 'LLEG_JOINT0'
@@ -46,6 +46,7 @@ rArmOffset = [-0.05,-0.050,-0.050]
 rArmNormal = [1,0,0]
 rArmx = 0.024; rArmy = 0.024
 fullBody.addLimb(rarmId,rarm,rHand,rArmOffset,rArmNormal, rArmx, rArmy, 20000, "random", 0.05)
+
 
 larmId = '4LA'
 larm = 'LARM_JOINT0'
@@ -78,13 +79,17 @@ q_goal = fullBody.generateContacts(q_goal, [0,0,1])
 
 
 
+fullBody.createOctreeBoxes(r.client.gui,1,'0RL', q_0)
+fullBody.createOctreeBoxes(r.client.gui,1,'3RA', q_0)
+q_0[2] = 4
+fullBody.draw(q_0,r)
 
 fullBody.setStartState(q_init,[rLegId,lLegId,rarmId,larmId])
 fullBody.setEndState(q_goal,[rLegId,lLegId,rarmId,larmId])
 #~ 
 #~ r(q_init)
-configs = fullBody.interpolate(0.1)
-r.loadObstacleModel ('hpp-rbprm-corba', "scene_wall", "contact")
+#~ configs = fullBody.interpolate(0.1)
+#~ r.loadObstacleModel ('hpp-rbprm-corba', "scene_wall", "contact")
 #~ fullBody.exportAll(r, configs, 'standing_hrp2_robust_2');
 #~ configs = fullBody.interpolate(0.09)
 #~ configs = fullBody.interpolate(0.08)

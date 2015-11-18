@@ -12,7 +12,7 @@ srdfSuffix = ""
 rbprmBuilder = Builder ()
 
 rbprmBuilder.loadModel(urdfName, urdfNameRom, rootJointType, meshPackageName, packageName, urdfSuffix, srdfSuffix)
-rbprmBuilder.setJointBounds ("base_joint_xyz", [-2,5, -1, 1, 0.3, 4])
+rbprmBuilder.setJointBounds ("base_joint_xyz", [-2.5,5, -1, 1, 0.3, 4])
 rbprmBuilder.setFilter(['hyq_rhleg_rom', 'hyq_lfleg_rom', 'hyq_rfleg_rom','hyq_lhleg_rom'])
 rbprmBuilder.setNormalFilter('hyq_lhleg_rom', [0,0,1], 0.5)
 rbprmBuilder.setNormalFilter('hyq_rfleg_rom', [0,0,1], 0.5)
@@ -52,7 +52,7 @@ f.close()
 from hpp.gepetto import PathPlayer
 pp = PathPlayer (rbprmBuilder.client.basic, r)
 
-#~ rbprmBuilder.exportPath (r, ps.client.problem, 1, 0.1, "darpa_hyq_path.txt")
+rbprmBuilder.exportPath (r, ps.client.problem, 1, 0.1, "darpa_hyq_path2a.txt")
 #~ pp.fromFile("/home/stonneau/dev/hpp/src/hpp-rbprm-corba/script/paths/stair.path")
 #~ 
 #~ pp (2)

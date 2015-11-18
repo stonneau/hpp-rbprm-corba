@@ -18,7 +18,7 @@ rbprmBuilder.setFilter(['hrp2_larm_rom','hrp2_rarm_rom','hrp2_lleg_rom','hrp2_rl
 #~ rbprmBuilder.setNormalFilter('hrp2_rarm_rom', [-1,0,0], 0.5)
 #~ rbprmBuilder.setNormalFilter('hrp2_lleg_rom', [0,0,1], 0.5)
 #~ rbprmBuilder.setNormalFilter('hrp2_rleg_rom', [0,0,1], 0.5)
-rbprmBuilder.boundSO3([-0.4,0.4,-3,3,-3,3])
+#~ rbprmBuilder.boundSO3([-0.4,0.4,-3,3,-3,3])
 
 #~ from hpp.corbaserver.rbprm. import ProblemSolver
 from hpp.corbaserver.rbprm.problem_solver import ProblemSolver
@@ -35,8 +35,10 @@ q_goal [0:3] = [0.19, 0.05, 0.9]; r (q_goal)
 #~ fullBody.client.basic.robot.setJointConfig('base_joint_SO3',[0.7316888688738209, 0, -0.6816387600233341, 0]); q_init = rbprmBuilder.getCurrentConfig (); r (q_init)
 
 rbprmBuilder.client.basic.robot.setJointConfig('base_joint_SO3',[0.7316888688738209, 0, 0.6816387600233341, 0]); q_init = rbprmBuilder.getCurrentConfig (); r (q_init)
+rbprmBuilder.client.basic.robot.setJointConfig('base_joint_SO3',[-0.83907152907645244, 0.0, -0.54402111088936977, 0.0]); q_init = rbprmBuilder.getCurrentConfig (); r (q_init)
 q_init = rbprmBuilder.getCurrentConfig ();
 q_init [0:3] = [-1, 0.05, 0.4]; rbprmBuilder.setCurrentConfig (q_init); r (q_init)
+q_init [0:3] = [-0.8, 0.05, 0.4]; rbprmBuilder.setCurrentConfig (q_init); r (q_init)
 #~ q_0 [0:3] = [-0.2, 0, 0.3]; r (q_0)
 
 

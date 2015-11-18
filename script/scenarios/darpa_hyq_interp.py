@@ -92,7 +92,7 @@ r.loadObstacleModel ('hpp-rbprm-corba', "darpa", "contact")
 #~ fullBody.createOctreeBoxes(r.client.gui, 1, larmId, q_0,)
 i = 0;
 fullBody.draw(configs[i],r); i=i+1; i-1
-#~ fullBody.exportAll(r, configs, 'darpa_hyq_robust_1');
+fullBody.exportAll(r, configs, 'darpa_hyq_robust_2a');
 #~ r (configs[i]); i=i+1; i-1
 
 #~ q0 = configs[2]
