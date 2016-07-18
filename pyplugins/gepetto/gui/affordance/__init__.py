@@ -1,0 +1,1 @@
+from affordancewidget import Plugin
