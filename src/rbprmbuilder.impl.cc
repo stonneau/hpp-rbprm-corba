@@ -327,14 +327,14 @@ namespace hpp {
       return reachability;
   }
 
-  void RbprmBuilder::getReachableContactArea (const char* limbname) throw (hpp::Error)
+  void RbprmBuilder::getReachableContactArea (const char* romname) throw (hpp::Error)
   {
-      model::T_Rom::const_iterator limbRomIt = romDevices_.find (limbname);
-      if (limbRomIt == romDevices_.end ()) {
-          std::string err ("No Rom of name " + std::string(limbname) + " found!");
+      model::T_Rom::const_iterator romIt = romDevices_.find (romname);
+      if (romIt == romDevices_.end ()) {
+          std::string err ("No Rom of name " + std::string(romname) + " found!");
           throw Error (err.c_str());
       }
-      model::DevicePtr_t limbRom = limbRomIt->second;
+      model::DevicePtr_t limbRom = romIt->second;
       const model::ObjectVector_t& reachability = getReachability (limbRom->getJointVector ());
 
    // find affordance object in contact with given limb
