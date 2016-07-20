@@ -1,4 +1,4 @@
-from PythonQt import QtGui, Qt
+from PythonQt import QtGui, Qt, QtCore
 from gepetto.corbaserver import Client
 from hpp.corbaserver.rbprm import Client as rbprmClient
 from hpp.corbaserver import Client as basicClient
@@ -9,26 +9,47 @@ class _AffCreator (QtGui.QWidget):
     def __init__(self, parent, plugin):
         super(_AffCreator, self).__init__ (parent)
         self.plugin = plugin
-        box = QtGui.QVBoxLayout(self)
-
+        vbox1 = QtGui.QVBoxLayout(self)
+        # vbox1.setGeometry(QtCore.QRect(1000,1000,1000,1000))
+        # vbox1.setSpacing(20)
+        gridW = QtGui.QWidget()#(self)
+        grid = QtGui.QGridLayout(gridW)
+        
+        #hbox1.setSpacing (0) #no effect
+        #box.setMargin(0)
+        #self.affMargin.setAlignment(Qt.Qt.AlignLeft)
+        
         # Affordance Types
         self.affordanceTypes = QtGui.QComboBox(self)
         self.affordanceTypes.editable = False
-        box.addWidget(self.addWidgetsInHBox( [QtGui.QLabel("            Affordance Type:"),
-            self.affordanceTypes]))
+        self.affordanceTypes.setMaximumWidth(100)
+        affTypeLabel = QtGui.QLabel("Affordance Type:")
+        affTypeLabel.setMaximumWidth(200)
+
+        grid.addWidget(self.addWidgetsInHBox( [affTypeLabel,
+            self.affordanceTypes]), 0,0)
 
         # Affordance Creation by Name
         self.affMargin = QtGui.QDoubleSpinBox() 
         self.affMargin.setValue (0.03)
-        box.addWidget(self.addWidgetsInHBox([QtGui.QLabel("               Normal Margin:"), self.affMargin]))
+        self.affMargin.setMaximumWidth(100)
+        marginLabel = QtGui.QLabel("Normal Margin:")
+        marginLabel.setMaximumWidth(200)
+        grid.addWidget(self.addWidgetsInHBox([marginLabel, self.affMargin]), 1,0)
         self.affNTriMargin = QtGui.QDoubleSpinBox()
         self.affNTriMargin.setValue (0.03)
-        box.addWidget(self.addWidgetsInHBox([QtGui.QLabel("Neighbouring Triangle Margin:"), self.affNTriMargin]))
+        self.affNTriMargin.setMaximumWidth(100)
+        nTMarginLabel = QtGui.QLabel("Neighbour-Triangle Margin:")
+        nTMarginLabel.setMaximumWidth(200)
+        grid.addWidget(self.addWidgetsInHBox([nTMarginLabel, self.affNTriMargin]), 0,1)
         self.affMinArea = QtGui.QDoubleSpinBox()
         self.affMinArea.setValue (0.05)
-        box.addWidget(self.addWidgetsInHBox([QtGui.QLabel("                Minimum Area:"), self.affMinArea]))
+        self.affMinArea.setMaximumWidth(100)
+        areaLabel = QtGui.QLabel("Minimum Area:")
+        areaLabel.setMaximumWidth(200)
+        grid.addWidget(self.addWidgetsInHBox([areaLabel, self.affMinArea]), 1,1)
         
-
+        vbox1.addWidget(gridW)
         # Name line edit
         #self.nodeName = QtGui.QLineEdit("nodeName")
         #box.addWidget(self.addWidgetsInHBox([QtGui.QLabel("Node name:"), self.nodeName]))
@@ -37,7 +58,7 @@ class _AffCreator (QtGui.QWidget):
         #box.addWidget(self.bindFunctionToButton("Create group", self.createGroup))
 
         # Add Affordance Configuration
-        box.addWidget(self.bindFunctionToButton("Edit Affordance Configuration", self.setAffConfig))
+        vbox1.addWidget(self.bindFunctionToButton("Edit Affordance Configuration", self.setAffConfig))
 
     #    # Add to group
     #    self.groupNodes = QtGui.QComboBox(self)
@@ -52,11 +73,11 @@ class _AffCreator (QtGui.QWidget):
         self.affAnalysisObjects.editable = False
         self.affAnalysisOptions = QtGui.QComboBox(self)
         self.affAnalysisOptions.editable = False
-        box.addWidget(self.addWidgetsInHBox( [
+        vbox1.addWidget(self.addWidgetsInHBox( [
             QtGui.QLabel("Choose object:"), self.affAnalysisObjects,
             QtGui.QLabel("Choose affordance type:"), self.affAnalysisOptions]))
 
-        box.addWidget(self.bindFunctionToButton("Find Affordances", self.affordanceAnalysis))
+        vbox1.addWidget(self.bindFunctionToButton("Find Affordances", self.affordanceAnalysis))
         # Add mesh
         #box.addWidget(self.bindFunctionToButton("Add mesh", self.addMesh))
 
@@ -87,6 +108,13 @@ class _AffCreator (QtGui.QWidget):
         hboxName = QtGui.QHBoxLayout(nameParentW)
         for w in widgets:
             hboxName.addWidget(w)
+        return nameParentW
+
+    def addWidgetsInVBox(self, widgets):
+        nameParentW = QtGui.QWidget(self)
+        vboxName = QtGui.QVBoxLayout(nameParentW)
+        for w in widgets:
+            vboxName.addWidget(w)
         return nameParentW
 
     def bindFunctionToButton (self, buttonLabel, func):
@@ -149,16 +177,13 @@ class _AffCreator (QtGui.QWidget):
                  str (objs.index (aff)) + '.' + str(count), str (affType))
             count += 1
         scenes = self.plugin.client.gui.getSceneList() #TODO: add check to see whether scenes is empty
-        print (len(scenes))
-        print (len(scenes[0]))
-        groupNodes = self.plugin.client.gui.getGroupNodeList(scenes[0])
-        self.plugin.client.gui.addToGroup (str (affType), scenes[0])
-        print ("Still alive")
+        groupNodes = self.plugin.client.gui.getGroupNodeList("hpp-gui")
+        self.plugin.client.gui.addToGroup (str (affType), "hpp-gui")
         # By default, oldest node is displayed in front. Removing and re-adding
         # object from scene assure that the new triangles are displayed on top     
         for groupNode in groupNodes :
-            self.plugin.client.gui.removeFromGroup(groupNode, scenes[0])
-            self.plugin.client.gui.addToGroup(groupNode, scenes[0])
+            self.plugin.client.gui.removeFromGroup(groupNode, "hpp-gui")
+            self.plugin.client.gui.addToGroup(groupNode, "hpp-gui")
         return
 
     def visualiseAffordances (self, affType, colour, obstacleName=""):
@@ -184,13 +209,13 @@ class _AffCreator (QtGui.QWidget):
                 self.plugin.client.gui.addToGroup (name, str (affType))
                 count += 1
           scenes = self.plugin.client.gui.getSceneList() #TODO: add check to see whether scenes is empty
-          groupNodes = self.plugin.client.gui.getGroupNodeList(scenes[0])
-          self.plugin.client.gui.addToGroup (str (affType), scenes[0])
+          groupNodes = self.plugin.client.gui.getGroupNodeList('hpp-gui')
+          self.plugin.client.gui.addToGroup (str (affType), 'hpp-gui')
           # By default, oldest node is displayed in front. Removing and re-adding i
           # object from scene assure that the new triangles are displayed on top     
           for groupNode in groupNodes :
-              self.plugin.client.gui.removeFromGroup(groupNode,scenes[0])
-              self.plugin.client.gui.addToGroup(groupNode,scenes[0])
+              self.plugin.client.gui.removeFromGroup(groupNode,'hpp-gui')
+              self.plugin.client.gui.addToGroup(groupNode,'hpp-gui')
         return
 
     def deleteNode (self, nodeName, all):
@@ -271,10 +296,15 @@ class Plugin(QtGui.QDockWidget):
         self.basicClient  = basicClient ()
         self.affClient = affClient ()
         # Initialize the widget
-        self.tabWidget = QtGui.QTabWidget(self)
+        self.tabWidget = QtGui.QTabWidget() #(self)
         self.setWidget (self.tabWidget)
-        self.nodeCreator = _AffCreator(self, self)
-        self.tabWidget.addTab (self.nodeCreator, "Affordance Creator")
+        self.affCreator = _AffCreator(self, self)
+        self.tabWidget.addTab (self.affCreator, "Affordance Creator")
+        layout1 = QtGui.QHBoxLayout()
+        layout1.addWidget(QtGui.QLabel("Testing Tab"))
+        widget = QtGui.QWidget()
+        widget.setLayout(layout1)
+        self.tabWidget.addTab (widget, "Affordance Creator Tab2")
         self.main = mainWindow
         mainWindow.connect('refresh()', self.refresh)
 
@@ -289,7 +319,7 @@ class Plugin(QtGui.QDockWidget):
         self.affClient = affClient ()
 
     def refresh(self):
-        self.nodeCreator.update()
+        self.affCreator.update()
 
     def selected(self, name, posInWorldFrame):
         QtGui.QMessageBox.information(self, "Selected object", name + " " + str(posInWorldFrame))
