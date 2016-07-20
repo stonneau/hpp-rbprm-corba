@@ -55,6 +55,7 @@ ADD_REQUIRED_DEPENDENCY("hpp-affordance-corba")
 PKG_CONFIG_APPEND_LIBS(${PROJECT_NAME})
 ADD_SUBDIRECTORY(src)
 ADD_SUBDIRECTORY(pyplugins)
+ADD_SUBDIRECTORY(plugins)
 
 CONFIG_FILES (include/hpp/corbaserver/rbprm/doc.hh)
 
