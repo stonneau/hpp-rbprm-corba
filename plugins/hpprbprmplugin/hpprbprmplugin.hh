@@ -9,7 +9,6 @@
 namespace hpp {
   /// namespace that encapsulate the hpp's plugin for gepetto-gui
   namespace rbprm {
-    /// HppCorbaserverPlugin allows to launch a corbaserver when gui is launch
     class HppRbprmPlugin : public QObject,
     public gepetto::gui::PluginInterface
     {

@@ -2,6 +2,7 @@
 
 #include <hpp/core/problem-solver.hh>
 #include <hpp/corbaserver/rbprm/server.hh>
+
 #include <hppserverprocess.hh>
 
 /// Plugin to emulate a corbaserver for hpp-core
@@ -28,10 +29,15 @@ namespace hpp {
     void HppRbprmPlugin::init()
     {
       hpp::core::ProblemSolverPtr_t ps = hpp::core::ProblemSolver::create ();
-      hpp::rbprm::impl::Server rbprmServer =
-          new hpp::rbprm::impl::Server (0, NULL, true, "rbprmChild");
-      rbprmServer.setProblemSolver (ps);
-      server_ = new gepetto::gui::CorbaServer(new HppServerProcess(rbprmServer));
+
+      hpp::corbaServer::Server* basic = new hpp::corbaServer::Server (ps, 0, NULL, true);
+      hpp::rbprm::impl::Server* rbprm =
+          new hpp::rbprm::Server (0, NULL, true, "rbprmChild");
+      rbprm->setProblemSolver (ps);
+      hpp::affordance::Server* aff = new hpp::affordance::Server (0, NULL, true);
+      aff->setProblemSolver (ps);
+
+      server_ = new gepetto::gui::CorbaServer(new HppServerProcess(basic, rbprm, aff));
       server_->start();
       server_->waitForInitDone();
     }

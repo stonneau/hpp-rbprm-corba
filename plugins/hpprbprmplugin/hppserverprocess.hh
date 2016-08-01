@@ -1,7 +1,9 @@
 #ifndef HPP_RBPRM_HPPSERVERPROCESS_HH
 #define HPP_RBPRM_HPPSERVERPROCESS_HH
 
-#include <hpp/corbaserver/fwd.hh>
+#include <hpp/corbaserver/server.hh>
+#include <hpp/corbaserver/rbprm/server.hh>
+#include <hpp/corbaserver/affordance/server.hh>
 
 #include <gepetto/gui/omniorb/omniorbthread.hh>
 
@@ -12,7 +14,8 @@ namespace hpp {
       Q_OBJECT
 
       public:
-        HppServerProcess (hpp::corbaServer::Server* server_);
+        HppServerProcess (hpp::corbaServer::Server* basic,
+                hpp::rbprm::Server* rbprm, hpp::affordance::Server* aff);
 
         ~HppServerProcess ();
 
@@ -22,6 +25,8 @@ namespace hpp {
 
       private:
         hpp::corbaServer::Server* server_;
+        hpp::rbprm::Server* rbprm_;
+        hpp::affordance::Server* aff_;
     };
   } // namespace rbprm
 } // namespace hpp
