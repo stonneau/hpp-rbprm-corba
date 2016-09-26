@@ -3,6 +3,18 @@ from gepetto.corbaserver import Client
 from hpp.corbaserver.rbprm import Client as rbprmClient
 from hpp.corbaserver import Client as basicClient
 from hpp.corbaserver.affordance import Client as affClient
+from hpp.corbaserver.rbprm.rbprmbuilder import Builder
+
+### This class represents one special tab of the new QDockWidget
+class _RbprmPath (QtGui.QWidget):
+    def __init__(self, parent, plugin):
+        super(_RbprmPath, self).__init__ (parent)
+        self.plugin = plugin
+        self.update ()
+
+    def update(self):
+        self.builder = "builder"
+
 
 ### This class represents one special tab of the new QDockWidget
 class _AffCreator (QtGui.QWidget):
@@ -58,7 +70,7 @@ class _AffCreator (QtGui.QWidget):
         #box.addWidget(self.bindFunctionToButton("Create group", self.createGroup))
 
         # Add Affordance Configuration
-        vbox1.addWidget(self.bindFunctionToButton("Edit Affordance Configuration", self.setAffConfig))
+        vbox1.addWidget(self.bindFunctionToButton("Edit", self.setAffConfig))
 
     #    # Add to group
     #    self.groupNodes = QtGui.QComboBox(self)
@@ -73,10 +85,16 @@ class _AffCreator (QtGui.QWidget):
         self.affAnalysisObjects.editable = False
         self.affAnalysisOptions = QtGui.QComboBox(self)
         self.affAnalysisOptions.editable = False
-        vbox1.addWidget(self.addWidgetsInHBox( [
-            QtGui.QLabel("Choose object:"), self.affAnalysisObjects,
-            QtGui.QLabel("Choose affordance type:"), self.affAnalysisOptions]))
+       
+        self.colour = [0.7450980392156863, 1.0, 0.3333333333333333, 1]
+        self.affColour = QtGui.QAction('Font bg Color', self)
+        self.affColour.triggered.connect(self.colour_picker)
 
+        vbox1.addWidget(self.addWidgetsInHBox( [
+            QtGui.QLabel("Object:"), self.affAnalysisObjects,
+            QtGui.QLabel("Affordance type:"), self.affAnalysisOptions]))
+
+        vbox1.addWidget(self.bindFunctionToButton("Choose Colour", self.colour_picker))
         vbox1.addWidget(self.bindFunctionToButton("Find Affordances", self.affordanceAnalysis))
         # Add mesh
         #box.addWidget(self.bindFunctionToButton("Add mesh", self.addMesh))
@@ -84,24 +102,45 @@ class _AffCreator (QtGui.QWidget):
         # Add box
         #box.addWidget(self.bindFunctionToButton("Add box", self.addBox))
 
+        self.deleteObjects = QtGui.QComboBox(self)
+        self.deleteObjects.editable = False
+        self.deleteAffs = QtGui.QComboBox(self)
+        self.deleteAffs.editable = False
+        vbox1.addWidget(self.addWidgetsInHBox( [
+            QtGui.QLabel("Object:"), self.deleteObjects,
+            QtGui.QLabel("Affordance type:"), self.deleteAffs]))
+        vbox1.addWidget(self.bindFunctionToButton("Delete Affordances", self.deleteAffordancesByType))
+
         self.update()
 
     def update(self):
-    #    self.groupNodes.clear()
-    #    for n in self.plugin.client.gui.getSceneList():
-    #        self.groupNodes.addItem (n)
+   #     self.groupNodes.clear()
+   #     for n in self.plugin.client.gui.getSceneList():
+   #         self.groupNodes.addItem (n)
         self.affordanceTypes.clear()
         self.affAnalysisOptions.clear()
-        affordances = self.getAffordanceTypes()
+        affordances = self.getAffordanceConfigTypes()
         for aff in affordances:
             self.affordanceTypes.addItem (aff)
             self.affAnalysisOptions.addItem (aff)
-        self.affAnalysisOptions.addItem("All Types")
-        self.affAnalysisObjects.clear()
-        objects = self.plugin.basicClient.obstacle.getObstacleNames(True,False)
+   #     self.affordanceTypes.addItem ("Support")
+   #     self.affordanceTypes.addItem ("Lean")
+   #     self.affAnalysisOptions.addItem ("Support")
+   #     self.affAnalysisOptions.addItem ("Lean")
+        self.affAnalysisOptions.addItem ("All types")
+        self.affAnalysisObjects.clear ()
+        self.deleteObjects.clear ()
+        objects = self.plugin.basicClient.obstacle.getObstacleNames(False,True)
         for obj in objects:
             self.affAnalysisObjects.addItem (obj)
-        self.affAnalysisObjects.addItem ("all objects")
+            self.deleteObjects.addItem (obj)
+        self.affAnalysisObjects.addItem ("All objects")
+        self.deleteObjects.addItem ("All objects")
+        self.deleteAffs.clear ()
+        affordances = self.getAffordanceTypes()
+        for aff in affordances:
+            self.deleteAffs.addItem (aff)
+        self.deleteAffs.addItem ("All types")
 
     def addWidgetsInHBox(self, widgets):
         nameParentW = QtGui.QWidget(self)
@@ -123,13 +162,18 @@ class _AffCreator (QtGui.QWidget):
         button.connect ('clicked()', func)
         return button
 
+    def colour_picker (self):
+        colour = QtGui.QColorDialog.getColor()
+        self.colour = [colour.redF(), colour.greenF(), colour.blueF(), colour.alphaF()]
+        print (self.colour)
+
     def addMesh (self):
         filename = QtGui.QFileDialog.getOpenFileName (self, "Choose a mesh")
         self.plugin.client.gui.addMesh(str(self.nodeName.text), str(filename))
         self.refreshBodyTree()
 
     def addBox (self):
-        self.plugin.client.gui.addBox(str(self.nodeName.text), 1, 1, 1, [1, 0, 0, 1])
+        self.plugin.client.gui.addBox(str(self.nodeName.text), 1, 1, 1, self.colour)
         self.refreshBodyTree()
 
     def createGroup (self):
@@ -147,12 +191,19 @@ class _AffCreator (QtGui.QWidget):
 
     def affordanceAnalysis (self):
         objectname = str(self.affAnalysisObjects.currentText)
-        if objectname == "all objects":
+        affType = str(self.affAnalysisOptions.currentText)
+        if objectname == "All objects":
             objectname = ""
             self.plugin.affClient.affordance.analyseAll ()
         else:
-            self.plugin.affClient.affordance.analyseObject (str(self.affAnalysisObjects.currentText))
-        self.visualiseAffordances("Support", [0.25, 0.5, 0.5, 1], objectname)
+            self.plugin.affClient.affordance.analyseObject (objectname)
+        if affType == "All types":
+            affordances = self.getAffordanceTypes ()
+            for aff in affordances:
+                 self.visualiseAffordances(aff, self.colour, objectname)
+        else:
+            self.visualiseAffordances(affType, self.colour, objectname)
+        self.update ()
 
     def getAffordancePoints (self, affordanceType):
         return self.plugin.affClient.affordance.getAffordancePoints (affordanceType)
@@ -224,6 +275,9 @@ class _AffCreator (QtGui.QWidget):
     def getAffordanceTypes (self):
         return self.plugin.affClient.affordance.getAffordanceTypes ()
 
+    def getAffordanceConfigTypes (self):
+        return self.plugin.affClient.affordance.getAffordanceConfigTypes ()
+
     def getAffRefObstacles (self, affType):
         return self.plugin.affClient.affordance.getAffRefObstacles (affType)
 
@@ -235,7 +289,7 @@ class _AffCreator (QtGui.QWidget):
         affs = self.getAffordanceTypes ()
         if obstacleName == "":
             for aff in affs:
-                self.deleteNode (aff, True, Viewer)
+                self.deleteNode (aff, True)
         else:
            import re
            for aff in affs:
@@ -248,17 +302,27 @@ class _AffCreator (QtGui.QWidget):
                  for node in nodes:
                    splt = re.split ('\.', node)
                    if splt[0] == toDelete:
-                     self.deleteNode (node, True, Viewer)
+                     self.deleteNode (node, True)
                count += 1
         return
 
-    def deleteAffordancesByType (self, affordanceType, obstacleName=""):
-        self.deleteAffordancesByTypeFromViewer (affordanceType, obstacleName)
-        return self.plugin.affClient.affordance.deleteAffordancesByType(affordanceType, obstacleName)
+    def deleteAffordancesByType (self):
+        objectname = str(self.deleteObjects.currentText)
+        affType = str(self.deleteAffs.currentText)
+        if objectname == "All objects":
+            objectname = ""
+        if affType == "All types":
+            affType == ""
+            self.plugin.affClient.affordance.deleteAffordances(objectname)
+        else:
+            self.deleteAffordancesByTypeFromViewer (affType, objectname)
+            self.plugin.affClient.affordance.deleteAffordancesByType (affType, objectname)
+        self.update ()
+        return
 
     def deleteAffordancesByTypeFromViewer (self, affordanceType, obstacleName=""):
         if obstacleName == "":
-          self.plugin.affClient.gui.deleteNode (affordanceType, True)
+          self.deleteNode (affordanceType, True)
         else:
            import re
            affs = self.getAffordanceTypes ()
@@ -293,6 +357,7 @@ class Plugin(QtGui.QDockWidget):
             super(Plugin, self).__init__ ("Affordance plugin", mainWindow, flags)
         self.client = Client ()
         self.rbprmClient = rbprmClient ()
+        self.builder = Builder ()
         self.basicClient  = basicClient ()
         self.affClient = affClient ()
         # Initialize the widget

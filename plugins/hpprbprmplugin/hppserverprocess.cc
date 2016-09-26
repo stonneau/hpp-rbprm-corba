@@ -1,12 +1,12 @@
 #include "hppserverprocess.hh"
 
 #include <hpp/corbaserver/rbprm/server.hh>
-#include <hpp/corbaserver/rbprm/common.hh>
+#include <hpp/corbaserver/common.hh>
 
 namespace hpp {
   namespace rbprm {
     HppServerProcess::HppServerProcess(hpp::corbaServer::Server* basic, 
-            hpp::rbprm::Server* rbprm, hpp::affordance::Server* aff)
+            hpp::rbprm::Server* rbprm, hpp::affordanceCorba::Server* aff)
       : basic_ (basic), rbprm_ (rbprm), aff_ (aff)
     {}
 

@@ -1,6 +1,6 @@
 #
-# Copyright (c) 2015 CNRS
-# Authors: Joseph Mirabel
+# Copyright (c) 2016 CNRS
+# Authors: Anna Seppala
 #
 #
 # This file is part of hpp-rbprm-corba
@@ -20,6 +20,7 @@
 INCLUDE_DIRECTORIES(${CMAKE_CURRENT_SOURCE_DIR})
 INCLUDE_DIRECTORIES(${CMAKE_CURRENT_BINARY_DIR})
 
+ADD_REQUIRED_DEPENDENCY ("hpp-rbprm-corba")
 SET(BUILD_HPP_RBPRM_PLUGIN ${HPP_RBPRM_FOUND}
   CACHE BOOL "Build hppcorbaserverplugin")
 

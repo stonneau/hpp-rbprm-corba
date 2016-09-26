@@ -15,7 +15,7 @@ namespace hpp {
 
       public:
         HppServerProcess (hpp::corbaServer::Server* basic,
-                hpp::rbprm::Server* rbprm, hpp::affordance::Server* aff);
+                hpp::rbprm::Server* rbprm, hpp::affordanceCorba::Server* aff);
 
         ~HppServerProcess ();
 
@@ -24,9 +24,9 @@ namespace hpp {
         void processRequest (bool loop);
 
       private:
-        hpp::corbaServer::Server* server_;
+        hpp::corbaServer::Server* basic_;
         hpp::rbprm::Server* rbprm_;
-        hpp::affordance::Server* aff_;
+        hpp::affordanceCorba::Server* aff_;
     };
   } // namespace rbprm
 } // namespace hpp

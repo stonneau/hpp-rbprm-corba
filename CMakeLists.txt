@@ -39,6 +39,14 @@ SET(${PROJECT_NAME}_HEADERS
   include/hpp/corbaserver/rbprm/server.hh
 )
 
+# This line allows QT-MOC to compile with the include from gepetto-gui
+# It cannot be done through the pkg-config framework because the moc settings
+# are generated before PKG_CONFIG_USE_DEPENDENCY calls.
+# Without this, file
+# gepetto/gui/plugin-interface.hh
+# is not found.
+INCLUDE_DIRECTORIES(${GEPETTO_VIEWER_CORBA_INCLUDE_DIRS})
+
 # Activate hpp-util logging if requested
 SET (HPP_DEBUG FALSE CACHE BOOL "trigger hpp-util debug output")
 IF (HPP_DEBUG)

@@ -35,7 +35,7 @@ signals:
       private:
           gepetto::gui::CorbaServer* server_;
     };
-  } // namespace gui
+  } // namespace rbprm
 } // namespace hpp
 
 #endif // HPP_GUI_HPPRBPRMPLUGIN_HH

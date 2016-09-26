@@ -1,6 +1,6 @@
 #
-# Copyright (c) 2015 CNRS
-# Authors: Joseph Mirabel
+# Copyright (c) 2016 CNRS
+# Authors: Anna Seppala
 #
 #
 # This file is part of hpp-rbprm-corba
@@ -58,5 +58,7 @@ ADD_LIBRARY(${PLUGIN_NAME} SHARED ${${PLUGIN_NAME}_SOURCES}
 TARGET_LINK_LIBRARIES(${PLUGIN_NAME} ${QT_LIBRARIES})
 PKG_CONFIG_USE_DEPENDENCY(${PLUGIN_NAME} "hpp-corbaserver")
 PKG_CONFIG_USE_DEPENDENCY(${PLUGIN_NAME} "gepetto-viewer-corba")
+PKG_CONFIG_USE_DEPENDENCY(${PLUGIN_NAME} "hpp-affordance-corba")
+PKG_CONFIG_USE_DEPENDENCY(${PLUGIN_NAME} "hpp-rbprm-corba")
 
 INSTALL(TARGETS ${PLUGIN_NAME} DESTINATION lib/gepetto-gui-plugins)
