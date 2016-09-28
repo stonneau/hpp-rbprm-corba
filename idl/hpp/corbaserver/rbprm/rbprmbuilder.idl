@@ -96,6 +96,17 @@ module hpp
     void setFilter (in Names_t roms)
       raises (Error);
 
+    /// Return names of affordance filters set for
+    /// a given ROM of robot.
+    /// \param rom ROM for which affordance filters are to be returned
+    Names_t getAffordanceFilter (in string rom) raises (Error);
+
+    /// Return names of ROMs of robot that have filter.
+    Names_t getFilter () raises (Error);
+
+    /// Return names of ROM devices of robot.
+    Names_t getROMnames () raises (Error);
+
     /// Set Rom surface constraints for the configuration shooter
     /// a Rom configuration will only be valid if it collides with a surface
     /// that forms a given affordance (support, lean, etc.)

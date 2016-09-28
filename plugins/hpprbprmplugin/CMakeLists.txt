@@ -25,7 +25,9 @@ SET(${PLUGIN_NAME}_HEADERS
   )
 
 FIND_PACKAGE(Qt4 REQUIRED QtCore QtGui QtOpenGl QtNetwork)
+ADD_REQUIRED_DEPENDENCY("hpp-rbprm-corba")
 ADD_REQUIRED_DEPENDENCY("gepetto-viewer-corba")
+#ADD_REQUIRED_DEPENDENCY("hpp-corbaserver")
 
 SET(${PLUGIN_NAME}_FORMS
   )
@@ -60,5 +62,6 @@ PKG_CONFIG_USE_DEPENDENCY(${PLUGIN_NAME} "hpp-corbaserver")
 PKG_CONFIG_USE_DEPENDENCY(${PLUGIN_NAME} "gepetto-viewer-corba")
 PKG_CONFIG_USE_DEPENDENCY(${PLUGIN_NAME} "hpp-affordance-corba")
 PKG_CONFIG_USE_DEPENDENCY(${PLUGIN_NAME} "hpp-rbprm-corba")
+TARGET_LINK_LIBRARIES (${PLUGIN_NAME} hpp-rbprm)
 
 INSTALL(TARGETS ${PLUGIN_NAME} DESTINATION lib/gepetto-gui-plugins)

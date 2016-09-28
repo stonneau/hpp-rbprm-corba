@@ -3,17 +3,242 @@ from gepetto.corbaserver import Client
 from hpp.corbaserver.rbprm import Client as rbprmClient
 from hpp.corbaserver import Client as basicClient
 from hpp.corbaserver.affordance import Client as affClient
-from hpp.corbaserver.rbprm.rbprmbuilder import Builder
 
 ### This class represents one special tab of the new QDockWidget
 class _RbprmPath (QtGui.QWidget):
     def __init__(self, parent, plugin):
         super(_RbprmPath, self).__init__ (parent)
         self.plugin = plugin
+        vbox = QtGui.QVBoxLayout(self)
+        robotLabel = QtGui.QLabel("Set up rbprm models:")
+        vbox.addWidget(robotLabel)
+        vbox.addWidget(self.addWidgetsInHBox([self.bindFunctionToButton("Load ROM robot",\
+                self.Robot), self.bindFunctionToButton("Load environment", self.Environment)]))
+        filterLabel = QtGui.QLabel("Add filters:")
+        vbox.addWidget(filterLabel)
+        self.ROMlist = QtGui.QListWidget()
+        self.ROMlist.setSelectionMode(QtGui.QAbstractItemView.ExtendedSelection)
+        filterLabel2 = QtGui.QLabel("Choose ROM:")
+        self.ROMfilterList = QtGui.QListWidget()
+        filterLabel3 = QtGui.QLabel("Existing filters:")
+        vbox.addWidget(self.addWidgetsInHBox([filterLabel2,filterLabel3]))
+        vbox.addWidget(self.addWidgetsInHBox([self.ROMlist, self.bindFunctionToButton("Add",\
+                self.addFilter), self.ROMfilterList]))
+        filterLabel = QtGui.QLabel("Add affordance filters:")
+        vbox.addWidget(filterLabel)
+        self.ROMaffList = QtGui.QListWidget()
+        self.ROMaffList.setSelectionMode(QtGui.QAbstractItemView.ExtendedSelection)
+        self.ROMaffFilterList = QtGui.QTreeWidget()
+        filterLabel4 = QtGui.QLabel("Choose ROM")
+        filterLabel5 = QtGui.QLabel("Existing affordance filters:")
+        self.affTypeList = QtGui.QListWidget()
+        self.affTypeList.setSelectionMode(QtGui.QAbstractItemView.ExtendedSelection)
+        vbox.addWidget(self.addWidgetsInHBox([filterLabel4,filterLabel5]))
+        vbox.addWidget(self.addWidgetsInHBox([self.ROMaffList, self.affTypeList,\
+                self.bindFunctionToButton("Add",\
+                self.addAffFilter), self.ROMaffFilterList]))
+        vbox.addWidget(self.bindFunctionToButton("Panic!",self.addToViewer))
         self.update ()
 
     def update(self):
-        self.builder = "builder"
+        self.ROMlist.clear()
+        self.ROMaffList.clear()
+        self.ROMaffFilterList.clear()
+        ROMnames = self.plugin.rbprmClient.rbprm.getROMnames ()
+        for name in ROMnames:
+            self.ROMlist.addItem (name)
+            self.ROMaffList.addItem (name)
+            afffilters = self.plugin.rbprmClient.rbprm.getAffordanceFilter(name)
+            if (len(afffilters) != 0):
+                item = QtGui.QTreeWidgetItem()
+                item.setText(0,name)
+                for affi in afffilters:
+                    child = QtGui.QTreeWidgetItem()
+                    child.setText(0,affi)
+                    item.addChild(child)
+                self.ROMaffFilterList.addTopLevelItem(item)
+                self.ROMaffFilterList.expandItem(item)
+        self.ROMfilterList.clear()
+        filters = self.plugin.rbprmClient.rbprm.getFilter ()
+        for fi in filters:
+            self.ROMfilterList.addItem(fi)
+        self.affTypeList.clear()
+        affs = self.getAffordanceConfigTypes ()
+        for aff in affs:
+            self.affTypeList.addItem(aff)
+
+    def addWidgetsInHBox(self, widgets):
+        nameParentW = QtGui.QWidget(self)
+        hboxName = QtGui.QHBoxLayout(nameParentW)
+        for w in widgets:
+            hboxName.addWidget(w)
+        return nameParentW
+
+    def bindFunctionToButton (self, buttonLabel, func):
+        button = QtGui.QPushButton(self)
+        button.text = buttonLabel
+        button.connect ('clicked()', func)
+        return button
+
+    def Robot (self):
+        self.robot = "load"
+        self.robotdialog = _RobotDialog()
+        self.robotdialog.exec_()
+        name = str(self.robotdialog.Envname.text)
+        packageName = str(self.robotdialog.pkgName.text)
+        urdfName =  str(self.robotdialog.urdfName.text)
+        meshPackageName = str(self.robotdialog.mpkgName.text)
+        urdfROMs = str(self.robotdialog.urdfromName.text)
+        urdfROMs = urdfROMs.replace(" ", "")
+        urdfNameRom = urdfROMs.split(',')
+        rootJointType = str(self.robotdialog.rootJoint.currentText)
+        urdfSuffix = str(self.robotdialog.urdfSuf.text)
+        srdfSuffix = str(self.robotdialog.srdfSuf.text)
+        self.loadModel(name, urdfName, urdfNameRom, rootJointType, \
+                meshPackageName, packageName, urdfSuffix, srdfSuffix)
+        self.update()
+
+    def Environment (self):
+        self.environment = "manual"
+        self.envdialog = _EnvDialog()
+        self.envdialog.exec_()
+        name = str(self.envdialog.Envname.text)
+        urdfName =  str(self.envdialog.urdfName.text)
+        packageName = str(self.envdialog.pkgName.text)
+        self.plugin.basicClient.obstacle.loadObstacleModel (packageName, urdfName, name)
+        self.update()
+
+    def loadModel (self, name, urdfName, urdfNameroms, rootJointType, meshPackageName, packageName, urdfSuffix, srdfSuffix):
+            if(isinstance(urdfNameroms, list)):    
+                for urdfNamerom in urdfNameroms:
+                    self.plugin.rbprmClient.rbprm.loadRobotRomModel(urdfNamerom, rootJointType, packageName, urdfNamerom, urdfSuffix, srdfSuffix)
+            else:
+                self.plugin.rbprmClient.rbprm.loadRobotRomModel(urdfNameroms, rootJointType, packageName, urdfNameroms, urdfSuffix, srdfSuffix)
+            self.plugin.rbprmClient.rbprm.loadRobotCompleteModel(name, rootJointType, packageName, urdfName, urdfSuffix, srdfSuffix)
+
+    def addFilter (self):
+        items = self.ROMlist.selectedItems()
+        if (len(items) > 0):
+            ROMnames = []
+            for item in items:
+                ROMnames.append(str(item.text()))
+            self.plugin.rbprmClient.rbprm.setFilter(ROMnames)
+        self.update()
+
+    def addAffFilter (self):
+        items = self.ROMaffList.selectedItems()
+        affItems = self.affTypeList.selectedItems()
+        if (len(items) > 0 and len (affItems) > 0):
+            affNames = []
+            for aff in affItems:
+                affNames.append(str(aff.text()))
+            for item in items:
+                self.plugin.rbprmClient.rbprm.setAffordanceFilter(str(item.text()), affNames)
+        self.update()
+
+    def getAffordanceConfigTypes (self):
+        return self.plugin.affClient.affordance.getAffordanceConfigTypes ()
+
+    def addToViewer (self):
+        self.plugin.client.gui.addUrdfObjects("hyq","/local/anna/devel/install/share/hyq_description",\
+                "/local/anna/devel/install/share/hyq_description",True)
+
+class _EnvDialog(QtGui.QDialog):
+    def __init__(self, parent=None):
+        super(_EnvDialog, self).__init__(parent)
+        self.grid = QtGui.QGridLayout()
+        self.grid.setSpacing(10)
+        self.setGeometry(440,418, 450, 450)
+        self.setWindowTitle('Input dialog')
+        # Create widgets
+        label = QtGui.QLabel("Choose predefined model or provide custom description.")
+        self.model = QtGui.QComboBox()
+        self.model.editable = False
+        text1 = QtGui.QLabel('Choose predefined model')
+        text2 = QtGui.QLabel('Model name')
+        self.Envname = QtGui.QLineEdit("planning")
+        self.button = QtGui.QPushButton("Details")
+        self.button.setCheckable(True)
+
+        # add widgets to grid
+        self.grid.addWidget (label, 0,0)
+        self.grid.addWidget (text1, 1,0)
+        self.grid.addWidget (self.model, 1,1)
+        self.grid.addWidget (text2,2,0,2,1)
+        self.grid.addWidget (self.Envname, 2,1,2,1)
+        self.grid.addWidget (self.button, 4,1,1,1)
+        # create grid 2 and its widgets
+        self.groupbox = QtGui.QGroupBox()
+        self.grid2 = QtGui.QGridLayout(self.groupbox)
+        self.grid2.setSpacing(10)
+        envText3 = QtGui.QLabel('Package name')
+        self.pkgName = QtGui.QLineEdit("hpp-rbprm-corba")
+        envText4 = QtGui.QLabel('Mesh package name')
+        self.mpkgName = QtGui.QLineEdit()
+        envText5 = QtGui.QLabel('URDF filename')
+        self.urdfName = QtGui.QLineEdit("darpa")
+        envText7 = QtGui.QLabel('URDF suffix')
+        self.urdfSuf = QtGui.QLineEdit()
+        envText8 = QtGui.QLabel('SRDF suffix')
+        self.srdfSuf = QtGui.QLineEdit()
+
+        # add widgets to grid2
+        self.grid2.addWidget (label, 0,0)    
+        self.grid2.addWidget (envText3, 1,0)
+        self.grid2.addWidget (self.pkgName, 1,2)     
+        self.grid2.addWidget (envText4, 2,0)
+        self.grid2.addWidget (self.mpkgName, 2,2)     
+        self.grid2.addWidget (envText5, 3,0)
+        self.grid2.addWidget (self.urdfName, 3,2)      
+        self.grid2.addWidget (envText7, 5,0)
+        self.grid2.addWidget (self.urdfSuf, 5,2)
+        self.grid2.addWidget (envText8, 6,0)
+        self.grid2.addWidget (self.srdfSuf, 6,2)
+       
+        self.OKbutton = QtGui.QPushButton("Load")
+        self.CANCELbutton = QtGui.QPushButton("Cancel")
+        self.grid.addWidget (self.groupbox,5,0,3,2)
+        self.groupbox.setHidden(True)
+        self.grid.addWidget (self.CANCELbutton, 8,0,1,1)
+        self.grid.addWidget (self.OKbutton, 8,1,1,1)
+
+        # Set dialog layout
+        self.setLayout(self.grid)
+        # Add button signal to showDetails slot
+        self.button.clicked.connect(lambda: self.hideWidget(self.groupbox, self.button))
+        self.OKbutton.clicked.connect(self.load)
+        self.CANCELbutton.clicked.connect(self.cancel)
+    # methods
+    def load (self):
+            self.accept()
+    def cancel (self):
+            self.reject()
+    def hideWidget (self,widget, button):
+        if button.isChecked():
+            widget.setHidden(False)
+        else:
+            widget.setHidden(True)
+        
+class _RobotDialog(_EnvDialog):
+    def __init__(self, parent=None):
+        super(_RobotDialog, self).__init__(parent)
+        #self.grid2.removeWidget(self.envText6)
+        #self.grid2.removeWidget(self.urdfromName)
+        text = QtGui.QLabel('Root-joint type')
+        self.rootJoint = QtGui.QComboBox()
+        self.rootJoint.addItem("freeflyer")
+        self.rootJoint.addItem("planar")
+        self.rootJoint.addItem("anchor")
+        self.grid.addWidget(text,3,0,1,1)
+        self.grid.addWidget(self.rootJoint,3,1,2,1)
+        self.envText6 = QtGui.QLabel('URDF ROM names, separated by commas')
+        self.urdfromName = QtGui.QLineEdit("hyq_rhleg_rom, hyq_lfleg_rom, hyq_rfleg_rom, hyq_lhleg_rom")
+        self.grid2.addWidget (self.envText6, 4,0)
+        self.grid2.addWidget (self.urdfromName, 4,2)
+        self.Envname.setText("hyq_trunk_large")
+        self.urdfName.setText("hyq_trunk_large")
+        self.pkgName.setText("hpp-rbprm-corba")
+        self.mpkgName.setText("hpp-rbprm-corba")
 
 
 ### This class represents one special tab of the new QDockWidget
@@ -62,24 +287,9 @@ class _AffCreator (QtGui.QWidget):
         grid.addWidget(self.addWidgetsInHBox([areaLabel, self.affMinArea]), 1,1)
         
         vbox1.addWidget(gridW)
-        # Name line edit
-        #self.nodeName = QtGui.QLineEdit("nodeName")
-        #box.addWidget(self.addWidgetsInHBox([QtGui.QLabel("Node name:"), self.nodeName]))
-
-        # Create group
-        #box.addWidget(self.bindFunctionToButton("Create group", self.createGroup))
 
         # Add Affordance Configuration
         vbox1.addWidget(self.bindFunctionToButton("Edit", self.setAffConfig))
-
-    #    # Add to group
-    #    self.groupNodes = QtGui.QComboBox(self)
-    #    self.groupNodes.editable = False
-    #    box.addWidget(self.addWidgetsInHBox( [
-    #        self.groupNodes,
-    #        self.bindFunctionToButton("Add to group", self.addToGroup)
-    #            ]))
-
         # Affordance Analysis Button
         self.affAnalysisObjects = QtGui.QComboBox(self)
         self.affAnalysisObjects.editable = False
@@ -96,11 +306,6 @@ class _AffCreator (QtGui.QWidget):
 
         vbox1.addWidget(self.bindFunctionToButton("Choose Colour", self.colour_picker))
         vbox1.addWidget(self.bindFunctionToButton("Find Affordances", self.affordanceAnalysis))
-        # Add mesh
-        #box.addWidget(self.bindFunctionToButton("Add mesh", self.addMesh))
-
-        # Add box
-        #box.addWidget(self.bindFunctionToButton("Add box", self.addBox))
 
         self.deleteObjects = QtGui.QComboBox(self)
         self.deleteObjects.editable = False
@@ -114,19 +319,12 @@ class _AffCreator (QtGui.QWidget):
         self.update()
 
     def update(self):
-   #     self.groupNodes.clear()
-   #     for n in self.plugin.client.gui.getSceneList():
-   #         self.groupNodes.addItem (n)
         self.affordanceTypes.clear()
         self.affAnalysisOptions.clear()
         affordances = self.getAffordanceConfigTypes()
         for aff in affordances:
             self.affordanceTypes.addItem (aff)
             self.affAnalysisOptions.addItem (aff)
-   #     self.affordanceTypes.addItem ("Support")
-   #     self.affordanceTypes.addItem ("Lean")
-   #     self.affAnalysisOptions.addItem ("Support")
-   #     self.affAnalysisOptions.addItem ("Lean")
         self.affAnalysisOptions.addItem ("All types")
         self.affAnalysisObjects.clear ()
         self.deleteObjects.clear ()
@@ -357,12 +555,13 @@ class Plugin(QtGui.QDockWidget):
             super(Plugin, self).__init__ ("Affordance plugin", mainWindow, flags)
         self.client = Client ()
         self.rbprmClient = rbprmClient ()
-        self.builder = Builder ()
         self.basicClient  = basicClient ()
         self.affClient = affClient ()
         # Initialize the widget
         self.tabWidget = QtGui.QTabWidget() #(self)
         self.setWidget (self.tabWidget)
+        self.rbprmPath = _RbprmPath (self,self)
+        self.tabWidget.addTab (self.rbprmPath, "Rbprm Path")
         self.affCreator = _AffCreator(self, self)
         self.tabWidget.addTab (self.affCreator, "Affordance Creator")
         layout1 = QtGui.QHBoxLayout()

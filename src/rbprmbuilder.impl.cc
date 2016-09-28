@@ -693,6 +693,60 @@ namespace hpp {
         bindShooter_.romFilter_ = stringConversion(roms);
     }
 
+    hpp::Names_t* RbprmBuilder::getAffordanceFilter (const char* rom) throw (hpp::Error)
+    {   
+        std::map<std::string, std::vector<std::string> >::const_iterator ROMit =
+            bindShooter_.affFilter_.find (rom);
+        if (ROMit == bindShooter_.affFilter_.end ()) {
+            std::cout << "RbprmBuilder::getAffordanceFilter: " << 
+                "no affordance filters found for ROM " << rom << std::endl;
+            return new hpp::Names_t (0,0, hpp::Names_t::allocbuf(0));
+        }
+        CORBA::ULong size = (CORBA::ULong) ROMit->second.size ();
+        char** nameList = hpp::Names_t::allocbuf(size);
+        hpp::Names_t* res = new hpp::Names_t (size,size, nameList);
+        CORBA::ULong count = 0;
+        for (std::vector<std::string>::const_iterator affIt = ROMit->second.begin ();
+                affIt != ROMit->second.end (); ++affIt) {
+              std::string name = *affIt;
+              nameList[count] = (char*) malloc (sizeof(char)*(name.length ()+1));
+              strcpy (nameList [count], name.c_str ());
+              ++count;
+        }
+	  return res;
+    }
+
+    hpp::Names_t* RbprmBuilder::getFilter () throw (hpp::Error)
+    {
+        CORBA::ULong size = (CORBA::ULong) bindShooter_.romFilter_.size ();
+        char** nameList = Names_t::allocbuf(size);
+        hpp::Names_t* res = new hpp::Names_t (size,size, nameList);
+        CORBA::ULong count = 0;
+        for (std::vector<std::string>::const_iterator fit = bindShooter_.romFilter_.begin ();
+                fit != bindShooter_.romFilter_.end (); ++fit) {
+              std::string name = *fit;
+              nameList[count] = (char*) malloc (sizeof(char)*(name.length ()+1));
+              strcpy (nameList [count], name.c_str ());
+              ++count;
+        }
+	  return res;
+    }
+
+    hpp::Names_t* RbprmBuilder::getROMnames () throw (hpp::Error)
+    {
+        CORBA::ULong size = (CORBA::ULong) romDevices_.size ();
+        char** nameList = Names_t::allocbuf(size);
+        hpp::Names_t* res = new hpp::Names_t (size,size, nameList);
+        CORBA::ULong count = 0;
+        for (model::T_Rom::const_iterator ROMit = romDevices_.begin (); ROMit != romDevices_.end (); ++ROMit) {
+              std::string name = ROMit->first;
+              nameList[count] = (char*) malloc (sizeof(char)*(name.length ()+1));
+              strcpy (nameList [count], name.c_str ());
+              ++count;
+        }
+	  return res;
+    }
+
 
     void RbprmBuilder::setAffordanceFilter(const char* romName, const hpp::Names_t& affordances) throw (hpp::Error)
     {
