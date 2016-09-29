@@ -3,6 +3,9 @@ from gepetto.corbaserver import Client
 from hpp.corbaserver.rbprm import Client as rbprmClient
 from hpp.corbaserver import Client as basicClient
 from hpp.corbaserver.affordance import Client as affClient
+from hpp.corbaserver.rbprm.rbprmbuilder import Builder
+from hpp.corbaserver.rbprm.problem_solver import ProblemSolver
+from hpp.gepetto import Viewer
 
 ### This class represents one special tab of the new QDockWidget
 class _RbprmPath (QtGui.QWidget):
@@ -108,13 +111,17 @@ class _RbprmPath (QtGui.QWidget):
         self.plugin.basicClient.obstacle.loadObstacleModel (packageName, urdfName, name)
         self.update()
 
-    def loadModel (self, name, urdfName, urdfNameroms, rootJointType, meshPackageName, packageName, urdfSuffix, srdfSuffix):
+    def loadModel (self, name, urdfName, urdfNameroms, rootJointType, meshPackageName,\
+            packageName, urdfSuffix, srdfSuffix):
             if(isinstance(urdfNameroms, list)):    
                 for urdfNamerom in urdfNameroms:
-                    self.plugin.rbprmClient.rbprm.loadRobotRomModel(urdfNamerom, rootJointType, packageName, urdfNamerom, urdfSuffix, srdfSuffix)
+                    self.plugin.rbprmClient.rbprm.loadRobotRomModel(urdfNamerom, rootJointType,\
+                            packageName, urdfNamerom, urdfSuffix, srdfSuffix)
             else:
-                self.plugin.rbprmClient.rbprm.loadRobotRomModel(urdfNameroms, rootJointType, packageName, urdfNameroms, urdfSuffix, srdfSuffix)
-            self.plugin.rbprmClient.rbprm.loadRobotCompleteModel(name, rootJointType, packageName, urdfName, urdfSuffix, srdfSuffix)
+                self.plugin.rbprmClient.rbprm.loadRobotRomModel(urdfNameroms, rootJointType,\
+                        packageName, urdfNameroms, urdfSuffix, srdfSuffix)
+            self.plugin.rbprmClient.rbprm.loadRobotCompleteModel(name, rootJointType, packageName,\
+                    urdfName, urdfSuffix, srdfSuffix)
 
     def addFilter (self):
         items = self.ROMlist.selectedItems()
@@ -140,8 +147,8 @@ class _RbprmPath (QtGui.QWidget):
         return self.plugin.affClient.affordance.getAffordanceConfigTypes ()
 
     def addToViewer (self):
-        self.plugin.client.gui.addUrdfObjects("hyq","/local/anna/devel/install/share/hyq_description",\
-                "/local/anna/devel/install/share/hyq_description",True)
+        self.plugin.ps = ProblemSolver(self.plugin.builder)
+        selg.plugin.r = Viewer(self.plugin.ps)
 
 class _EnvDialog(QtGui.QDialog):
     def __init__(self, parent=None):
@@ -555,6 +562,7 @@ class Plugin(QtGui.QDockWidget):
             super(Plugin, self).__init__ ("Affordance plugin", mainWindow, flags)
         self.client = Client ()
         self.rbprmClient = rbprmClient ()
+        self.builder = Builder ()
         self.basicClient  = basicClient ()
         self.affClient = affClient ()
         # Initialize the widget
