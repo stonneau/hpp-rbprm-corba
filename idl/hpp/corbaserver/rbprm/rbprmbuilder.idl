@@ -109,6 +109,8 @@ module hpp
 
     boolean validateConfiguration (in floatSeq configuration) raises (Error);
 
+    void clearAffordanceFilter() raises (Error);
+
     /// Set Rom surface constraints for the configuration shooter
     /// a Rom configuration will only be valid if it collides with a surface
     /// that forms a given affordance (support, lean, etc.)

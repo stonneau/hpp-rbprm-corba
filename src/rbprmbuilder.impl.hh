@@ -115,6 +115,7 @@ namespace hpp {
         virtual hpp::Names_t* getFilter () throw (hpp::Error);
         virtual hpp::Names_t* getROMnames () throw (hpp::Error);
         virtual bool validateConfiguration(const hpp::floatSeq& configuration) throw(hpp::Error);
+        virtual void clearAffordanceFilter() throw (hpp::Error);
 				virtual void setAffordanceFilter(const char* romName, const hpp::Names_t& affordances) throw (hpp::Error);
         virtual std::vector<Eigen::Vector3d> getContactPoints (const char* limbname, model::T_Rom& romDevices,
                 const core::ProblemSolverPtr_t& problemSolver,const unsigned int stateId, Eigen::VectorXd& contactPose);

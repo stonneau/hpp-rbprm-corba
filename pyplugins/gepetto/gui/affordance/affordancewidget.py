@@ -152,18 +152,22 @@ class _RbprmPath (QtGui.QWidget):
         vbox.addWidget(robotLabel)
         vbox.addWidget(self.addWidgetsInHBox([self.bindFunctionToButton("Load ROM robot",\
                 self.Robot), self.bindFunctionToButton("Load environment", self.Environment)]))
-        filterLabel = QtGui.QLabel("Add filters:")
-        vbox.addWidget(filterLabel)
+      #  filterLabel = QtGui.QLabel("Add filters:")
+      #  vbox.addWidget(filterLabel)
         self.ROMlist = QtGui.QListWidget()
         self.ROMlist.setSelectionMode(QtGui.QAbstractItemView.ExtendedSelection)
         filterLabel2 = QtGui.QLabel("Choose ROM:")
         self.ROMfilterList = QtGui.QListWidget()
-        filterLabel3 = QtGui.QLabel("Existing filters:")
+      #  filterLabel3 = QtGui.QLabel("Existing filters:")
       #  vbox.addWidget(self.addWidgetsInHBox([filterLabel2,filterLabel3]))
-        vbox.addWidget(self.addWidgetsInHBox([self.ROMlist, self.bindFunctionToButton("Add",\
-                self.addFilter), self.ROMfilterList]))
-        filterLabel = QtGui.QLabel("Add affordance filters:")
+      #  vbox.addWidget(self.addWidgetsInHBox([self.ROMlist, self.bindFunctionToButton("Clear",\
+      #          self.clearFilters), self.ROMfilterList]))
+        filterLabel = QtGui.QLabel("Add filters:")
         vbox.addWidget(filterLabel)
+        self.groupbox2 = QtGui.QGroupBox()
+        self.vbox2 = QtGui.QVBoxLayout(self.groupbox2)
+        self.vbox2.addWidget(self.bindFunctionToButton("Clear",self.clearFilters))
+        self.vbox2.addWidget(self.bindFunctionToButton("Add",self.addFilters))
         self.ROMaffList = QtGui.QListWidget()
         self.ROMaffList.setSelectionMode(QtGui.QAbstractItemView.ExtendedSelection)
         self.ROMaffFilterList = QtGui.QTreeWidget()
@@ -173,8 +177,7 @@ class _RbprmPath (QtGui.QWidget):
         self.affTypeList.setSelectionMode(QtGui.QAbstractItemView.ExtendedSelection)
       #  vbox.addWidget(self.addWidgetsInHBox([filterLabel4,filterLabel5]))
         vbox.addWidget(self.addWidgetsInHBox([self.ROMaffList, self.affTypeList,\
-                self.bindFunctionToButton("Add",\
-                self.addAffFilter), self.ROMaffFilterList]))
+                self.groupbox2, self.ROMaffFilterList]))
         vbox.addWidget(self.addWidgetsInHBox([self.bindFunctionToButton("Set joint bounds",\
                 self.JointBounds), self.bindFunctionToButton("Panic!",self.addToViewer)]))
 
@@ -215,7 +218,11 @@ class _RbprmPath (QtGui.QWidget):
         self.grid2.addWidget (self.spiny,1,1)
         self.grid2.addWidget (label3,2,0)
         self.grid2.addWidget (self.spinz,2,1)
-
+        label4 = QtGui.QLabel("Config validation:")
+        self.validator = QtGui.QGroupBox()
+        self.validator.setStyleSheet("background-color: blue")
+        self.grid2.addWidget (label4,0,2)
+        self.grid2.addWidget (self.validator,1,2,2,1)
         vbox.addWidget(self.addWidgetsInHBox([self.configTree, self.groupbox]))
 
         self.clickTick.clicked.connect(self.setChooseWithMouse)
@@ -235,16 +242,18 @@ class _RbprmPath (QtGui.QWidget):
         for name in ROMnames:
             self.ROMlist.addItem (name)
             self.ROMaffList.addItem (name)
-            afffilters = self.plugin.rbprmClient.rbprm.getAffordanceFilter(name)
+        filters = self.plugin.rbprmClient.rbprm.getFilter ()
+        for fi in filters:
+            afffilters = self.plugin.rbprmClient.rbprm.getAffordanceFilter(fi)
+            item = QtGui.QTreeWidgetItem()
+            item.setText(0,fi)
             if (len(afffilters) > 0):
-                item = QtGui.QTreeWidgetItem()
-                item.setText(0,name)
                 for affi in afffilters:
                     child = QtGui.QTreeWidgetItem()
                     child.setText(0,affi)
                     item.addChild(child)
-                self.ROMaffFilterList.addTopLevelItem(item)
-                self.ROMaffFilterList.expandItem(item)
+            self.ROMaffFilterList.addTopLevelItem(item)
+            self.ROMaffFilterList.expandItem(item)
         self.ROMfilterList.clear()
         filters = self.plugin.rbprmClient.rbprm.getFilter ()
         for fi in filters:
@@ -341,24 +350,27 @@ class _RbprmPath (QtGui.QWidget):
             self.plugin.rbprmClient.rbprm.loadRobotCompleteModel(name, rootJointType, packageName,\
                     urdfName, urdfSuffix, srdfSuffix)
 
-    def addFilter (self):
-        items = self.ROMlist.selectedItems()
-        if (len(items) > 0):
-            ROMnames = []
-            for item in items:
-                ROMnames.append(str(item.text()))
-            self.plugin.rbprmClient.rbprm.setFilter(ROMnames)
+    def clearFilters (self):
+        ROMnames = []
+        self.plugin.rbprmClient.rbprm.setFilter(ROMnames)
+        self.plugin.rbprmClient.rbprm.clearAffordanceFilter()
         self.update()
 
-    def addAffFilter (self):
+    def addFilters (self):
         items = self.ROMaffList.selectedItems()
         affItems = self.affTypeList.selectedItems()
-        if (len(items) > 0 and len (affItems) > 0):
-            affNames = []
-            for aff in affItems:
-                affNames.append(str(aff.text()))
+        if (len(items) > 0):
+            ROMnames = self.plugin.rbprmClient.rbprm.getFilter()
             for item in items:
-                self.plugin.rbprmClient.rbprm.setAffordanceFilter(str(item.text()), affNames)
+                rom = str(item.text())
+                if rom not in ROMnames:
+                    ROMnames.append(rom)
+            self.plugin.rbprmClient.rbprm.setFilter(ROMnames)
+        affNames = []
+        for aff in affItems:
+            affNames.append(str(aff.text()))
+        for item in items:
+            self.plugin.rbprmClient.rbprm.setAffordanceFilter(str(item.text()), affNames)
         self.update()
 
     def getAffordanceConfigTypes (self):
@@ -379,6 +391,10 @@ class _RbprmPath (QtGui.QWidget):
     def showConfig(self, q):
         if len(q) == self.plugin.basicClient.robot.getConfigSize():
             self.r (q)
+            if self.plugin.rbprmClient.rbprm.validateConfiguration(q):
+                self.validator.setStyleSheet("background-color: green")
+            else:
+                self.validator.setStyleSheet("background-color: red")
         self.update()
 
     def addConfig (self):
@@ -886,41 +902,6 @@ class _FullBodyDialog (_RobotDialog):
         self.envText6.setHidden(True)
         self.urdfromName.setHidden(True)
 
-class _QColorButton(QtGui.QPushButton):
-    #colorChanged = QtCore.pyqtSignal()
-
-    def __init__(self, *args, **kwargs):
-        super(_QColorButton, self).__init__(*args, **kwargs)
-        self._color = [0.7450980392156863, 1.0, 0.3333333333333333, 1]
-        self.setMaximumWidth(32)
-        self.pressed.connect(self.onColorPicker)
-
-    def setColor(self, color):
-        if color != self._color:
-            self._color = color
-     #       self.colorChanged.emit()
-
-        if self._color:
-            self.setStyleSheet("background-color: %s;" % self._color)
-        else:
-            self.setStyleSheet("")
-
-    def color(self):
-        return self._color
-
-    def onColorPicker(self):
-        dlg = QtGui.QColorDialog(self)
-        if self._color:
-            dlg.setCurrentColor(QtGui.QColor(self._color))
-
-        if dlg.exec_():
-            self.setColor(dlg.currentColor().name())
-
-    #def mousePressEvent(self, e):
-    #    if e.button() == Qt.RightButton:
-    #        self.setColor(None)
-
-    #    return super(_QColorButton, self).mousePressEvent(e)
 ### This class represents one special tab of the new QDockWidget
 class _AffCreator (QtGui.QWidget):
     def __init__(self, parent, plugin):
