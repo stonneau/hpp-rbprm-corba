@@ -36,6 +36,8 @@ namespace hpp {
   namespace rbprm {
     namespace impl {
 
+    typedef boost::function <ConfigurationShooterPtr_t (const DevicePtr_t&) > ConfigurationShooterBuilder_t;
+
     RbprmBuilder::RbprmBuilder ()
     : POA_hpp::corbaserver::rbprm::RbprmBuilder()
     , romLoaded_(false)
@@ -698,8 +700,8 @@ namespace hpp {
         std::map<std::string, std::vector<std::string> >::const_iterator ROMit =
             bindShooter_.affFilter_.find (rom);
         if (ROMit == bindShooter_.affFilter_.end ()) {
-            std::cout << "RbprmBuilder::getAffordanceFilter: " << 
-                "no affordance filters found for ROM " << rom << std::endl;
+    //        std::cout << "RbprmBuilder::getAffordanceFilter: " << 
+    //            "no affordance filters found for ROM " << rom << std::endl;
             return new hpp::Names_t (0,0, hpp::Names_t::allocbuf(0));
         }
         CORBA::ULong size = (CORBA::ULong) ROMit->second.size ();
@@ -747,6 +749,29 @@ namespace hpp {
 	  return res;
     }
 
+    bool RbprmBuilder::validateConfiguration(const hpp::floatSeq& configuration) throw(hpp::Error)
+    {
+        model::Configuration_t config = dofArrayToConfig (fullBody_->device_, configuration);
+        std::map<std::string, ConfigurationShooterBuilder_t>shooterMap =
+            bindShooter_.problemSolver_->map<core::ConfigurationShooterBuilder_t>();
+		           if (shooterMap.empty ()) {
+       	        throw hpp::Error ("RbprmBuilder::validateConfiguration: no shooters found in problemsolver.");
+         		  }
+        std::map<std::string, ConfigurationShooterBuilder_t>::const_iterator shooterIt =
+            shooterMap.find("RbprmShooter");
+        if (shooterIt == shooterMap.end ()){
+           throw hpp::Error ("RbprmBuilder::validateConfiguration: RbprmShooter not found in problemsolver.");
+        }
+        rbprm::RbPrmShooterPtr_t shooter = boost::static_pointer_cast<rbprm::RbPrmShooter>(shooterIt->second);
+        rbprm::RbPrmValidationPtr_t validator = shooter->validator_;
+        ValidationReportPtr_t reportShPtr(new CollisionValidationReport);
+        bool validTrunk = validator->trunkValidation_->validate(*config, reportShPtr);
+        CollisionValidationReport* report = static_cast<CollisionValidationReport*>(reportShPtr.get());
+        bool validRoms = valid && validator->validateRoms(*config, bindShooter_.romFilter_);
+        bool valid = validator->validate(*config, bindShooter_.romFilter_);
+
+        std::cout << "validTrunk: " << validTrunk << ", validRoms: " << validRoms << ", valid: " << valid << std::endl; 
+    }
 
     void RbprmBuilder::setAffordanceFilter(const char* romName, const hpp::Names_t& affordances) throw (hpp::Error)
     {

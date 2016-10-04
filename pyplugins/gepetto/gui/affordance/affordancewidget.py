@@ -4,8 +4,138 @@ from hpp.corbaserver.rbprm import Client as rbprmClient
 from hpp.corbaserver import Client as basicClient
 from hpp.corbaserver.affordance import Client as affClient
 from hpp.corbaserver.rbprm.rbprmbuilder import Builder
+from hpp.corbaserver.rbprm.rbprmfullbody import FullBody
 from hpp.corbaserver.rbprm.problem_solver import ProblemSolver
 from hpp.gepetto import Viewer
+
+### This class represents one special tab of the new QDockWidget
+class _RbprmInterp (QtGui.QWidget):
+    def __init__(self, parent, plugin):
+        super(_RbprmInterp, self).__init__ (parent)
+        self.plugin = plugin
+        self.plugin.chooseWithMouse = False
+        self.initConfigSet = False
+        self.plugin.SO3bounds = [1,0,1,0,1,0]
+        self.configs = []
+        vbox = QtGui.QVBoxLayout(self)
+        robotLabel = QtGui.QLabel("Set up rbprm models:")
+        vbox.addWidget(robotLabel)
+        vbox.addWidget(self.addWidgetsInHBox([self.bindFunctionToButton("Load full-body model",\
+                self.Fullbody), self.bindFunctionToButton("Load limb models", self.Limb)]))
+        vbox.addWidget(self.addWidgetsInHBox([self.bindFunctionToButton("Compute contact sequence",\
+                self.computeContacts), self.bindFunctionToButton("Panic!",self.addToViewer)]))
+        self.slider = QtGui.QSlider(QtCore.Qt.Horizontal)
+        self.slider.setMinimum(1)
+        self.slider.setMaximum(10)
+        self.slider.setValue(1)
+        self.slider.setTickInterval(1)
+        vbox.addWidget(self.slider)
+
+        self.clickTick = QtGui.QCheckBox("Choose with mouse")
+        self.slider.valueChanged.connect(self.draw)
+
+        self.clickTick.clicked.connect(self.setChooseWithMouse)
+        #TODO: add tree element to show current set init and goal configs?
+        self.update ()
+
+    def update(self):
+        self.slider.setMaximum(len(self.configs)-1)
+        
+    def addWidgetsInHBox(self, widgets):
+        nameParentW = QtGui.QWidget(self)
+        hboxName = QtGui.QHBoxLayout(nameParentW)
+        for w in widgets:
+            hboxName.addWidget(w)
+        return nameParentW
+
+    def bindFunctionToButton (self, buttonLabel, func):
+        button = QtGui.QPushButton(self)
+        button.text = buttonLabel
+        button.connect ('clicked()', func)
+        return button
+
+    def Fullbody (self):
+        self.fbdialog = _FullBodyDialog()
+        if self.fbdialog.exec_():
+            name = str(self.fbdialog.Envname.text)
+            packageName = str(self.fbdialog.pkgName.text)
+            urdfName =  str(self.fbdialog.urdfName.text)
+            meshPackageName = str(self.fbdialog.mpkgName.text)
+            rootJointType = str(self.fbdialog.rootJoint.currentText)
+            urdfSuffix = str(self.fbdialog.urdfSuf.text)
+            srdfSuffix = str(self.fbdialog.srdfSuf.text)
+            self.plugin.fullbody.loadFullBodyModel (urdfName, rootJointType,\
+                    meshPackageName, packageName, urdfSuffix, srdfSuffix)
+            self.addToViewer()
+        self.update()
+
+    def Limb (self):
+        self.limbdialog = _LimbDialog()
+        if self.limbdialog.exec_():
+            tabs = self.limbdialog.tabs
+            self.legIds = []
+            for tab in tabs:
+                legId = str(tab.legId.text)
+                self.legIds.append(legId)
+                cType = str(tab.cType.currentText)
+                leg = str(tab.leg.text)
+                foot = str(tab.foot.text)
+                offset = self.str2float(str(tab.offset.text))
+                normal = self.str2float(str(tab.normal.text))
+                legxlegy = self.str2float(str(tab.legxlegy.text))
+                nbSamples = int(tab.nbSamples.value)
+                heuristic = str(tab.heur.currentText)
+                resolution = float(tab.res.value)
+                self.plugin.fullbody.addLimb(legId,leg,foot,offset,normal, legxlegy[0],\
+                        legxlegy[1], nbSamples, heuristic, resolution, cType)
+        self.update()
+
+    def computeContacts (self):
+        q_init = self.plugin.fullbody.getCurrentConfig()
+        q_init[0:7] = self.plugin.rbprmPath.q_init[0:7]
+        q_goal = self.plugin.fullbody.getCurrentConfig();
+        q_goal[0:7] = self.plugin.rbprmPath.q_goal[0:7]
+        self.plugin.fullbody.setCurrentConfig (q_init)
+        self.q_init = self.plugin.fullbody.generateContacts(q_init, [0,0,1])
+        self.plugin.fullbody.setCurrentConfig (q_goal)
+        self.q_goal = self.plugin.fullbody.generateContacts(q_goal, [0,0,1])
+        self.plugin.fullbody.setStartState(q_init,[])
+        self.plugin.fullbody.setEndState(q_goal,self.legIds)
+        self.r(q_init)
+        self.configs = self.plugin.fullbody.interpolate(0.1, 1, 0)
+        self.update()
+
+    def addToViewer (self):
+        self.ps = ProblemSolver(self.plugin.fullbody)
+        self.r = Viewer(self.ps)
+
+    def str2float (self,text):
+        str1 = str(text).replace(" ", "")
+        str2 = str1.split(',')
+        flist = []
+        for s in str2:
+            flist.append(float(s))
+        return flist
+    
+    def draw(self, i):
+        if len(self.configs) > 0:
+            config = self.configs[i]
+            self.plugin.fullbody.draw(config, self.r)
+
+    def showConfig(self):
+        if str(self.configCombo.currentText) == 'initial':
+            q = self.str2float(self.initq.text)
+        else:
+            q = self.str2float(self.goalq.text)
+        if len(q) == self.plugin.basicClient.robot.getConfigSize():
+            self.r (q)
+        self.update()
+
+    def setChooseWithMouse (self):
+        self.plugin.chooseWithMouse = True
+
+
+
 
 ### This class represents one special tab of the new QDockWidget
 class _RbprmPath (QtGui.QWidget):
@@ -15,6 +145,8 @@ class _RbprmPath (QtGui.QWidget):
         self.plugin.chooseWithMouse = False
         self.initConfigSet = False
         self.plugin.SO3bounds = [1,0,1,0,1,0]
+        self.q_init = [0,0,0,1,0,0,0]
+        self.q_goal = [0,0,0,1,0,0,0]
         vbox = QtGui.QVBoxLayout(self)
         robotLabel = QtGui.QLabel("Set up rbprm models:")
         vbox.addWidget(robotLabel)
@@ -55,16 +187,42 @@ class _RbprmPath (QtGui.QWidget):
         goalLabel = QtGui.QLabel("goal:")
         self.initq = QtGui.QLineEdit()
         self.goalq = QtGui.QLineEdit()
-        vbox.addWidget(self.addWidgetsInHBox([self.bindFunctionToButton("Show configuration",self.showConfig)\
-                , self.clickTick, self.configCombo]))
-        vbox.addWidget(self.addWidgetsInHBox([initLabel, self.initq, goalLabel, self.goalq,\
+        vbox.addWidget(self.addWidgetsInHBox([self.clickTick, self.configCombo,\
                 self.bindFunctionToButton("Add",self.addConfig),\
                 self.bindFunctionToButton("Clear",self.clearConfigs),\
                 self.bindFunctionToButton("Reset",self.resetConfigs)]))
+        vbox.addWidget(self.addWidgetsInHBox([initLabel, self.initq, goalLabel, self.goalq]))
         self.configTree = QtGui.QTreeWidget()
-        vbox.addWidget(self.configTree)
+
+        self.groupbox = QtGui.QGroupBox()
+        self.grid2 = QtGui.QGridLayout(self.groupbox)
+        self.grid2.setSpacing(10)
+        self.spinx = QtGui.QDoubleSpinBox ()
+        self.spiny = QtGui.QDoubleSpinBox ()
+        self.spinz = QtGui.QDoubleSpinBox ()
+        self.spinx.setRange(-10,10)
+        self.spiny.setRange(-10,10)
+        self.spinz.setRange(-10,10)
+        label1 = QtGui.QLabel("x")
+        label2 = QtGui.QLabel("y")
+        label3 = QtGui.QLabel("z")
+        self.spinx.setSingleStep (0.01)
+        self.spiny.setSingleStep (0.01)
+        self.spinz.setSingleStep (0.01)
+        self.grid2.addWidget (label1,0,0)
+        self.grid2.addWidget (self.spinx,0,1)
+        self.grid2.addWidget (label2,1,0)
+        self.grid2.addWidget (self.spiny,1,1)
+        self.grid2.addWidget (label3,2,0)
+        self.grid2.addWidget (self.spinz,2,1)
+
+        vbox.addWidget(self.addWidgetsInHBox([self.configTree, self.groupbox]))
 
         self.clickTick.clicked.connect(self.setChooseWithMouse)
+        self.spinx.valueChanged.connect(lambda: self.setConfigPos(self.spinx.value, 0))
+        self.spiny.valueChanged.connect(lambda: self.setConfigPos(self.spiny.value, 1))
+        self.spinz.valueChanged.connect(lambda: self.setConfigPos(self.spinz.value, 2))
+
         #TODO: add tree element to show current set init and goal configs?
         self.resetConfigs() # --> calls self.update()
         #self.update ()
@@ -115,7 +273,6 @@ class _RbprmPath (QtGui.QWidget):
                 item.addChild(child)
             self.configTree.addTopLevelItem(item)
             self.configTree.expandItem(item)
- 
         
     def addWidgetsInHBox(self, widgets):
         nameParentW = QtGui.QWidget(self)
@@ -214,16 +371,12 @@ class _RbprmPath (QtGui.QWidget):
     def str2float (self, text):
         str1 = str(text).replace(" ", "")
         str2 = str1.split(',')
-        flist = [0]*len(str2)
+        flist = []
         for s in str2:
-            flist[str2.index(s)] = float(s)
+            flist.append(float(s))
         return flist
 
-    def showConfig(self):
-        if str(self.configCombo.currentText) == 'initial':
-            q = self.str2float(self.initq.text)
-        else:
-            q = self.str2float(self.goalq.text)
+    def showConfig(self, q):
         if len(q) == self.plugin.basicClient.robot.getConfigSize():
             self.r (q)
         self.update()
@@ -231,22 +384,17 @@ class _RbprmPath (QtGui.QWidget):
     def addConfig (self):
         configSize = self.plugin.basicClient.robot.getConfigSize()
         if str(self.configCombo.currentText) == 'initial':
-            confStr = str(self.initq.text).replace(" ", "")
-            confList = confStr.split(',')
-            if len(confList) == configSize:
-                conf = [0]*configSize
-                for c in confList:
-                    conf[confList.index(c)] = float(c)
-            self.plugin.basicClient.problem.setInitialConfig(conf)
-            self.initConfigSet = True
+            conf = self.str2float(str(self.initq.text))
+            if len(conf) == configSize:
+                self.plugin.basicClient.problem.setInitialConfig(conf)
+                self.plugin.builder.setCurrentConfig(conf)
+                self.q_init = conf
+                self.initConfigSet = True
         else:
-            confStr = str(self.goalq.text).replace(" ", "")
-            confList = confStr.split(',')
-            if len(confList) == configSize:
-                conf = [0]*configSize
-                for c in confList:
-                    conf[confList.index(c)] = float(c)
+            conf = self.str2float(str(self.goalq.text))
+            if len(conf) == configSize:
                 self.plugin.basicClient.problem.addGoalConfig(conf)
+                self.q_goal = conf
         self.update ()
 
     def clearConfigs (self):
@@ -265,22 +413,35 @@ class _RbprmPath (QtGui.QWidget):
         self.goalq.setText(goalq)
         self.update()
 
-    def setConfigPos (self, p):
+    def qvector2float (self, p):
+        conf =  [p.x(), p.y(), p.z()]
+        return conf
+
+    def spinConfig (self):
         configSize = self.plugin.basicClient.robot.getConfigSize()
         if str(self.configCombo.currentText) == 'initial':
-            confStr = str(self.initq.text).replace(" ", "")
+            conf = self.str2float(self.initq.text)
         else:
-            confStr = str(self.goalq.text).replace(" ", "")
-        confList = confStr.split(',')
-        pos = [p.x(), p.y(), p.z()]
-        conf = [0]*configSize
-        conf[0:3] = pos
+            conf = self.str2float(self.goalq.text)
+        if len(conf) == configSize:
+            self.spinx.setValue(conf[0])
+            self.spiny.setValue(conf[1])
+            self.spinz.setValue(conf[2])
+
+    def setConfigPos (self, pos, idx):
+        configSize = self.plugin.basicClient.robot.getConfigSize()
+        if str(self.configCombo.currentText) == 'initial':
+            conf = self.str2float(self.initq.text)
+        else:
+            conf = self.str2float(self.goalq.text)
         # if config input incomplete, assume quat = [1,0,0,0] and other config variables == 0
         if len(conf) != configSize:
+            conf = [0]*configSize
             conf[3] = 1
+        if type(pos) == list:
+            conf[0:len(pos)] = pos
         else:
-            for i in range(3, configSize):
-                conf[i] = float(confList[i])
+            conf[idx] = pos
         config = str(conf)
         config = config.replace("[","")
         config = config.replace("]","")
@@ -288,6 +449,9 @@ class _RbprmPath (QtGui.QWidget):
             self.initq.text = config
         else:
             self.goalq.text = config
+        self.showConfig(conf)
+        self.spinConfig()
+        self.update()
 
     def setChooseWithMouse (self):
         self.plugin.chooseWithMouse = True
@@ -453,6 +617,168 @@ class _BoundsDialog(QtGui.QDialog):
         else:
             self.tick.setHidden(True)
 
+class _LimbTab (QtGui.QWidget):
+    def __init__(self, parent, plugin):
+        super(_LimbTab, self).__init__ (parent)
+        self.grid = QtGui.QGridLayout()
+        self.grid.setSpacing(10)
+        # Create widgets
+        label = QtGui.QLabel("Choose predefined model or provide custom description.")
+        self.model = QtGui.QComboBox()
+        self.model.editable = False
+        text1 = QtGui.QLabel('Choose predefined model')
+        text2 = QtGui.QLabel('Limb name')
+        self.legId = QtGui.QLineEdit("rfleg")
+        self.button = QtGui.QPushButton("Details")
+        self.button.setCheckable(True)
+
+        # add widgets to grid
+        self.grid.addWidget (label, 0,0)
+        self.grid.addWidget (text1, 1,0)
+        self.grid.addWidget (self.model, 1,1)
+        self.grid.addWidget (text2,2,0,2,1)
+        self.grid.addWidget (self.legId, 2,1,2,1)
+        self.grid.addWidget (self.button, 4,1,1,1)
+        # create grid 2 and its widgets
+        self.groupbox = QtGui.QGroupBox()
+        self.grid2 = QtGui.QGridLayout(self.groupbox)
+        self.grid2.setSpacing(10)
+        text3 = QtGui.QLabel('Constraint type')
+        self.cType = QtGui.QComboBox()
+        self.cType.addItem("_3_DOF")
+        text4 = QtGui.QLabel('First joint in URDF file')
+        self.leg = QtGui.QLineEdit("rf_haa_joint")
+        text5 = QtGui.QLabel('Last joint in URDF file')
+        self.foot = QtGui.QLineEdit("rf_foot_joint")
+        text6 = QtGui.QLabel('Offset between last joint and contact surface')
+        self.offset = QtGui.QLineEdit("0,-0.021,0")
+        text7 = QtGui.QLabel('Contact surface direciton for limb in rest pose')
+        self.normal = QtGui.QLineEdit("0,1,0")
+        text8 = QtGui.QLabel('Rectangular-contact-surface dimensions')
+        self.legxlegy = QtGui.QLineEdit("0.02,0.02")
+        text9 = QtGui.QLabel('Heuristic')
+        self.heur = QtGui.QComboBox()
+        self.heur.addItem ("manipulability")
+        text10 = QtGui.QLabel ("Octree resolution")
+        self.res = QtGui.QDoubleSpinBox()
+        self.res.setSingleStep (0.05)
+        self.res.setValue (0.1)
+        text11 = QtGui.QLabel ("Number of samples")
+        self.nbSamples = QtGui.QSpinBox()
+        self.nbSamples.setMaximum(30000)
+        self.nbSamples.setValue(20000)
+
+
+        # add widgets to grid2
+        self.grid2.addWidget (text3, 0,0)
+        self.grid2.addWidget (self.cType, 0,1)
+        self.grid2.addWidget (text4, 1,0)
+        self.grid2.addWidget (self.leg, 1,1)
+        self.grid2.addWidget (text5, 2,0)
+        self.grid2.addWidget (self.foot, 2,1)
+        self.grid2.addWidget (text6, 3,0)
+        self.grid2.addWidget (self.offset, 3,1)
+        self.grid2.addWidget (text7, 4,0)
+        self.grid2.addWidget (self.normal, 4,1)
+        self.grid2.addWidget (text8, 5,0)
+        self.grid2.addWidget (self.legxlegy, 5,1)
+        self.grid2.addWidget (text9, 6,0)
+        self.grid2.addWidget (self.heur, 6,1)
+        self.grid2.addWidget (text10, 7,0)
+        self.grid2.addWidget (self.res, 7,1)
+        self.grid2.addWidget (text11, 8,0)
+        self.grid2.addWidget (self.nbSamples, 8,1)
+       
+
+        self.grid.addWidget (self.groupbox,5,0,3,2)
+        self.groupbox.setHidden(True)
+
+        # Set dialog layout
+        self.setLayout(self.grid)
+        # Add button signal to showDetails slot
+        self.button.clicked.connect(lambda: self.hideWidget(self.groupbox, self.button))
+
+    def hideWidget (self,widget, button):
+        if button.isChecked():
+            widget.setHidden(False)
+        else:
+            widget.setHidden(True)
+
+class _LimbDialog(QtGui.QDialog):
+    def __init__(self, parent=None):
+        super(_LimbDialog, self).__init__(parent)
+        self.tabWidget = QtGui.QTabWidget()
+        self.setGeometry(440,470, 450, 490)
+        self.setWindowTitle('Input dialog')
+       #  self.tabWidget.addTab(self.tab, "tab")
+        self.tabs = [0]*4
+        text1 = QtGui.QLabel("Number of limbs")
+        self.limbs = QtGui.QSpinBox()
+        self.limbs.setValue(4)
+        self.limbs.setMaximum(10)
+        self.OKbutton = QtGui.QPushButton("Load all limbs")
+        self.CANCELbutton = QtGui.QPushButton("Cancel")
+        # Set dialog layout
+        layout = QtGui.QVBoxLayout()
+        layout.addWidget (self.addWidgetsInHBox([text1, self.limbs]))
+        layout.addWidget(self.tabWidget)
+        layout.addWidget (self.addWidgetsInHBox([self.CANCELbutton, self.OKbutton]))
+
+        self.setLayout(layout)
+        self.OKbutton.clicked.connect(self.load)
+        self.CANCELbutton.clicked.connect(self.cancel)
+        self.limbs.valueChanged.connect(self.update)
+        self.update()
+    # methods
+
+    def update (self):
+        self.tabWidget.clear()
+        self.tabs = [0]*self.limbs.value
+        for i in range(0,self.limbs.value):
+            self.tabs[i] = _LimbTab (self,self)
+            self.tabWidget.addTab(self.tabs[i], "limb" + str(i+1) )
+            if i == 1:
+                self.tabs[i].legId.setText("lhleg")
+                self.tabs[i].leg.setText("lh_haa_joint")
+                self.tabs[i].foot.setText("lh_foot_joint")
+                self.tabs[i].offset.setText("0,0.021,0")
+                self.tabs[i].normal.setText("0,-1,0")
+            if i == 2:
+                self.tabs[i].legId.setText("rhleg")
+                self.tabs[i].leg.setText("rh_haa_joint")
+                self.tabs[i].foot.setText("rh_foot_joint")
+            if i == 3:
+                self.tabs[i].legId.setText("lfleg")
+                self.tabs[i].leg.setText("lf_haa_joint")
+                self.tabs[i].foot.setText("lf_foot_joint")
+                self.tabs[i].offset.setText("0,0.021,0")
+                self.tabs[i].normal.setText("0,-1,0")
+
+    
+    def load (self):
+            self.accept()
+    def cancel (self):
+            self.reject()
+    def hideWidget (self,widget, button):
+        if button.isChecked():
+            widget.setHidden(False)
+        else:
+            widget.setHidden(True)
+
+    def addWidgetsInHBox(self, widgets):
+        nameParentW = QtGui.QWidget(self)
+        hboxName = QtGui.QHBoxLayout(nameParentW)
+        for w in widgets:
+            hboxName.addWidget(w)
+        return nameParentW
+
+    def bindFunctionToButton (self, buttonLabel, func):
+        button = QtGui.QPushButton(self)
+        button.text = buttonLabel
+        button.connect ('clicked()', func)
+        return button
+
+
 class _EnvDialog(QtGui.QDialog):
     def __init__(self, parent=None):
         super(_EnvDialog, self).__init__(parent)
@@ -550,7 +876,51 @@ class _RobotDialog(_EnvDialog):
         self.pkgName.setText("hpp-rbprm-corba")
         self.mpkgName.setText("hpp-rbprm-corba")
 
+class _FullBodyDialog (_RobotDialog):
+     def __init__(self, parent=None):
+        super(_FullBodyDialog, self).__init__(parent)
+        self.Envname.setText("hyq")
+        self.urdfName.setText("hyq")
+        self.pkgName.setText("hyq_description")
+        self.mpkgName.setText("hyq_description")
+        self.envText6.setHidden(True)
+        self.urdfromName.setHidden(True)
 
+class _QColorButton(QtGui.QPushButton):
+    #colorChanged = QtCore.pyqtSignal()
+
+    def __init__(self, *args, **kwargs):
+        super(_QColorButton, self).__init__(*args, **kwargs)
+        self._color = [0.7450980392156863, 1.0, 0.3333333333333333, 1]
+        self.setMaximumWidth(32)
+        self.pressed.connect(self.onColorPicker)
+
+    def setColor(self, color):
+        if color != self._color:
+            self._color = color
+     #       self.colorChanged.emit()
+
+        if self._color:
+            self.setStyleSheet("background-color: %s;" % self._color)
+        else:
+            self.setStyleSheet("")
+
+    def color(self):
+        return self._color
+
+    def onColorPicker(self):
+        dlg = QtGui.QColorDialog(self)
+        if self._color:
+            dlg.setCurrentColor(QtGui.QColor(self._color))
+
+        if dlg.exec_():
+            self.setColor(dlg.currentColor().name())
+
+    #def mousePressEvent(self, e):
+    #    if e.button() == Qt.RightButton:
+    #        self.setColor(None)
+
+    #    return super(_QColorButton, self).mousePressEvent(e)
 ### This class represents one special tab of the new QDockWidget
 class _AffCreator (QtGui.QWidget):
     def __init__(self, parent, plugin):
@@ -614,7 +984,10 @@ class _AffCreator (QtGui.QWidget):
             QtGui.QLabel("Object:"), self.affAnalysisObjects,
             QtGui.QLabel("Affordance type:"), self.affAnalysisOptions]))
 
-        vbox1.addWidget(self.bindFunctionToButton("Choose Colour", self.colour_picker))
+        self.colourButton = self.bindFunctionToButton("Choose Colour", self.colour_picker)
+        vbox1.addWidget(self.colourButton)
+      #  self.colorButton = _QColorButton("Choose colour")
+      #  vbox1.addWidget(self.colorButton)
         vbox1.addWidget(self.bindFunctionToButton("Find Affordances", self.affordanceAnalysis))
 
         self.deleteObjects = QtGui.QComboBox(self)
@@ -713,6 +1086,7 @@ class _AffCreator (QtGui.QWidget):
     def colour_picker (self):
         colour = QtGui.QColorDialog.getColor()
         self.colour = [colour.redF(), colour.greenF(), colour.blueF(), colour.alphaF()]
+        self.colourButton.setStyleSheet("background-color: %s;" % self.colour)
 
     def addMesh (self):
         filename = QtGui.QFileDialog.getOpenFileName (self, "Choose a mesh")
@@ -914,6 +1288,7 @@ class Plugin(QtGui.QDockWidget):
         self.client = Client ()
         self.rbprmClient = rbprmClient ()
         self.builder = Builder ()
+        self.fullbody = FullBody ()
         self.basicClient  = basicClient ()
         self.affClient = affClient ()
         #action = self.addAction("Affo")
@@ -928,8 +1303,11 @@ class Plugin(QtGui.QDockWidget):
         self.tabWidget.addTab (self.rbprmPath, "Rbprm Path")
         self.affCreator = _AffCreator(self, self)
         self.tabWidget.addTab (self.affCreator, "Affordance Creator")
-        #self.tabWidget.addTab (, "Affordance Creator Tab2")
+        self.rbprmInterp = _RbprmInterp (self,self)
+        self.tabWidget.addTab (self.rbprmInterp, "Rbprm Interp")
         self.main = mainWindow
+        mainSize = self.main.size
+        self.tabWidget.setMaximumSize(mainSize.height(), int(float(mainSize.width())*0.9))
         mainWindow.connect('refresh()', self.refresh)
         self.chooseWithMouse = False
         self.tabWidget.connect(self.tabWidget, QtCore.SIGNAL("currentChanged(int)"), self.updateSelected)
@@ -949,9 +1327,11 @@ class Plugin(QtGui.QDockWidget):
 
     def refresh(self):
         self.affCreator.update()
+        self.rbprmPath.update()
+        self.rbprmInterp.update()
 
     def selected(self, name, posInWorldFrame):
         if (self.chooseWithMouse):
             QtGui.QMessageBox.information(self, "Selected object", name + " " + str(posInWorldFrame))
-            self.rbprmPath.setConfigPos(posInWorldFrame)
+            self.rbprmPath.setConfigPos(self.rbprmPath.qvector2float (posInWorldFrame), -1)
 
