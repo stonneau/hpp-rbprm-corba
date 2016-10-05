@@ -9,135 +9,6 @@ from hpp.corbaserver.rbprm.problem_solver import ProblemSolver
 from hpp.gepetto import Viewer
 
 ### This class represents one special tab of the new QDockWidget
-class _RbprmInterp (QtGui.QWidget):
-    def __init__(self, parent, plugin):
-        super(_RbprmInterp, self).__init__ (parent)
-        self.plugin = plugin
-        self.plugin.chooseWithMouse = False
-        self.initConfigSet = False
-        self.plugin.SO3bounds = [1,0,1,0,1,0]
-        self.configs = []
-        vbox = QtGui.QVBoxLayout(self)
-        robotLabel = QtGui.QLabel("Set up rbprm models:")
-        vbox.addWidget(robotLabel)
-        vbox.addWidget(self.addWidgetsInHBox([self.bindFunctionToButton("Load full-body model",\
-                self.Fullbody), self.bindFunctionToButton("Load limb models", self.Limb)]))
-        vbox.addWidget(self.addWidgetsInHBox([self.bindFunctionToButton("Compute contact sequence",\
-                self.computeContacts), self.bindFunctionToButton("Panic!",self.addToViewer)]))
-        self.slider = QtGui.QSlider(QtCore.Qt.Horizontal)
-        self.slider.setMinimum(1)
-        self.slider.setMaximum(10)
-        self.slider.setValue(1)
-        self.slider.setTickInterval(1)
-        vbox.addWidget(self.slider)
-
-        self.clickTick = QtGui.QCheckBox("Choose with mouse")
-        self.slider.valueChanged.connect(self.draw)
-
-        self.clickTick.clicked.connect(self.setChooseWithMouse)
-        #TODO: add tree element to show current set init and goal configs?
-        self.update ()
-
-    def update(self):
-        self.slider.setMaximum(len(self.configs)-1)
-        
-    def addWidgetsInHBox(self, widgets):
-        nameParentW = QtGui.QWidget(self)
-        hboxName = QtGui.QHBoxLayout(nameParentW)
-        for w in widgets:
-            hboxName.addWidget(w)
-        return nameParentW
-
-    def bindFunctionToButton (self, buttonLabel, func):
-        button = QtGui.QPushButton(self)
-        button.text = buttonLabel
-        button.connect ('clicked()', func)
-        return button
-
-    def Fullbody (self):
-        self.fbdialog = _FullBodyDialog()
-        if self.fbdialog.exec_():
-            name = str(self.fbdialog.Envname.text)
-            packageName = str(self.fbdialog.pkgName.text)
-            urdfName =  str(self.fbdialog.urdfName.text)
-            meshPackageName = str(self.fbdialog.mpkgName.text)
-            rootJointType = str(self.fbdialog.rootJoint.currentText)
-            urdfSuffix = str(self.fbdialog.urdfSuf.text)
-            srdfSuffix = str(self.fbdialog.srdfSuf.text)
-            self.plugin.fullbody.loadFullBodyModel (urdfName, rootJointType,\
-                    meshPackageName, packageName, urdfSuffix, srdfSuffix)
-            self.addToViewer()
-        self.update()
-
-    def Limb (self):
-        self.limbdialog = _LimbDialog()
-        if self.limbdialog.exec_():
-            tabs = self.limbdialog.tabs
-            self.legIds = []
-            for tab in tabs:
-                legId = str(tab.legId.text)
-                self.legIds.append(legId)
-                cType = str(tab.cType.currentText)
-                leg = str(tab.leg.text)
-                foot = str(tab.foot.text)
-                offset = self.str2float(str(tab.offset.text))
-                normal = self.str2float(str(tab.normal.text))
-                legxlegy = self.str2float(str(tab.legxlegy.text))
-                nbSamples = int(tab.nbSamples.value)
-                heuristic = str(tab.heur.currentText)
-                resolution = float(tab.res.value)
-                self.plugin.fullbody.addLimb(legId,leg,foot,offset,normal, legxlegy[0],\
-                        legxlegy[1], nbSamples, heuristic, resolution, cType)
-        self.update()
-
-    def computeContacts (self):
-        q_init = self.plugin.fullbody.getCurrentConfig()
-        q_init[0:7] = self.plugin.rbprmPath.q_init[0:7]
-        q_goal = self.plugin.fullbody.getCurrentConfig();
-        q_goal[0:7] = self.plugin.rbprmPath.q_goal[0:7]
-        self.plugin.fullbody.setCurrentConfig (q_init)
-        self.q_init = self.plugin.fullbody.generateContacts(q_init, [0,0,1])
-        self.plugin.fullbody.setCurrentConfig (q_goal)
-        self.q_goal = self.plugin.fullbody.generateContacts(q_goal, [0,0,1])
-        self.plugin.fullbody.setStartState(q_init,[])
-        self.plugin.fullbody.setEndState(q_goal,self.legIds)
-        self.r(q_init)
-        self.configs = self.plugin.fullbody.interpolate(0.1, 1, 0)
-        self.update()
-
-    def addToViewer (self):
-        self.ps = ProblemSolver(self.plugin.fullbody)
-        self.r = Viewer(self.ps)
-
-    def str2float (self,text):
-        str1 = str(text).replace(" ", "")
-        str2 = str1.split(',')
-        flist = []
-        for s in str2:
-            flist.append(float(s))
-        return flist
-    
-    def draw(self, i):
-        if len(self.configs) > 0:
-            config = self.configs[i]
-            self.plugin.fullbody.draw(config, self.r)
-
-    def showConfig(self):
-        if str(self.configCombo.currentText) == 'initial':
-            q = self.str2float(self.initq.text)
-        else:
-            q = self.str2float(self.goalq.text)
-        if len(q) == self.plugin.basicClient.robot.getConfigSize():
-            self.r (q)
-        self.update()
-
-    def setChooseWithMouse (self):
-        self.plugin.chooseWithMouse = True
-
-
-
-
-### This class represents one special tab of the new QDockWidget
 class _RbprmPath (QtGui.QWidget):
     def __init__(self, parent, plugin):
         super(_RbprmPath, self).__init__ (parent)
@@ -148,26 +19,14 @@ class _RbprmPath (QtGui.QWidget):
         self.q_init = [0,0,0,1,0,0,0]
         self.q_goal = [0,0,0,1,0,0,0]
         vbox = QtGui.QVBoxLayout(self)
-        robotLabel = QtGui.QLabel("Set up rbprm models:")
-        vbox.addWidget(robotLabel)
         vbox.addWidget(self.addWidgetsInHBox([self.bindFunctionToButton("Load ROM robot",\
                 self.Robot), self.bindFunctionToButton("Load environment", self.Environment)]))
-      #  filterLabel = QtGui.QLabel("Add filters:")
-      #  vbox.addWidget(filterLabel)
-        self.ROMlist = QtGui.QListWidget()
-        self.ROMlist.setSelectionMode(QtGui.QAbstractItemView.ExtendedSelection)
-        filterLabel2 = QtGui.QLabel("Choose ROM:")
-        self.ROMfilterList = QtGui.QListWidget()
-      #  filterLabel3 = QtGui.QLabel("Existing filters:")
-      #  vbox.addWidget(self.addWidgetsInHBox([filterLabel2,filterLabel3]))
-      #  vbox.addWidget(self.addWidgetsInHBox([self.ROMlist, self.bindFunctionToButton("Clear",\
-      #          self.clearFilters), self.ROMfilterList]))
         filterLabel = QtGui.QLabel("Add filters:")
         vbox.addWidget(filterLabel)
         self.groupbox2 = QtGui.QGroupBox()
         self.vbox2 = QtGui.QVBoxLayout(self.groupbox2)
-        self.vbox2.addWidget(self.bindFunctionToButton("Clear",self.clearFilters))
         self.vbox2.addWidget(self.bindFunctionToButton("Add",self.addFilters))
+        self.vbox2.addWidget(self.bindFunctionToButton("Clear",self.clearFilters))
         self.ROMaffList = QtGui.QListWidget()
         self.ROMaffList.setSelectionMode(QtGui.QAbstractItemView.ExtendedSelection)
         self.ROMaffFilterList = QtGui.QTreeWidget()
@@ -178,6 +37,33 @@ class _RbprmPath (QtGui.QWidget):
       #  vbox.addWidget(self.addWidgetsInHBox([filterLabel4,filterLabel5]))
         vbox.addWidget(self.addWidgetsInHBox([self.ROMaffList, self.affTypeList,\
                 self.groupbox2, self.ROMaffFilterList]))
+        #----------------------- affrodance:
+        self.affGroup = QtGui.QGroupBox()
+        self.affGrid = QtGui.QGridLayout(self.affGroup)
+        self.affGrid.setSpacing(10)
+        # Affordance Analysis Button
+        self.affAnalysisObjects = QtGui.QComboBox(self)
+        self.affAnalysisObjects.editable = False
+        self.affAnalysisOptions = QtGui.QComboBox(self)
+        self.affAnalysisOptions.editable = False
+        self.colourButton = self.bindFunctionToButton("Colour", self.colour_picker)
+        qcolour = QtGui.QColor ("darkCyan");
+        self.colour = [qcolour.redF(), qcolour.greenF(), qcolour.blueF(), qcolour.alphaF()]
+        self.colourBox = QtGui.QGroupBox()
+        self.colourBox.setStyleSheet("background-color:" + str(qcolour.name()))
+        self.affGrid.addWidget(QtGui.QLabel("Affordance creator:"), 0,0)
+    #    self.affGrid.addWidget(QtGui.QLabel("Object:"), 1,0)
+        self.affGrid.addWidget(self.affAnalysisObjects,1,0)
+     #   self.affGrid.addWidget(QtGui.QLabel("Affordance type:"),1,2)
+        self.affGrid.addWidget(self.affAnalysisOptions, 1,1)
+        self.affGrid.addWidget(self.colourButton, 1,2)
+        self.affGrid.addWidget(self.colourBox, 1,3,2,1)
+        self.affGrid.addWidget(self.bindFunctionToButton("Settings", self.Affordance), 2,0)
+        self.affGrid.addWidget(self.bindFunctionToButton("Find", self.affordanceAnalysis), 2,1)
+        self.affGrid.addWidget(self.bindFunctionToButton("Delete", self.deleteAffordancesByType), 2,2)
+        vbox.addWidget (self.affGroup) 
+
+        #---------------------------joint bounds and config:
         vbox.addWidget(self.addWidgetsInHBox([self.bindFunctionToButton("Set joint bounds",\
                 self.JointBounds), self.bindFunctionToButton("Panic!",self.addToViewer)]))
 
@@ -188,12 +74,11 @@ class _RbprmPath (QtGui.QWidget):
         self.configCombo.addItem("goal")
         initLabel = QtGui.QLabel("initial:")
         goalLabel = QtGui.QLabel("goal:")
-        self.initq = QtGui.QLineEdit()
-        self.goalq = QtGui.QLineEdit()
+        self.initq = QtGui.QLineEdit("-2, 0, 0.63, 1, 0, 0, 0")
+        self.goalq = QtGui.QLineEdit("3, 0, 0.63, 1, 0, 0, 0")
         vbox.addWidget(self.addWidgetsInHBox([self.clickTick, self.configCombo,\
                 self.bindFunctionToButton("Add",self.addConfig),\
-                self.bindFunctionToButton("Clear",self.clearConfigs),\
-                self.bindFunctionToButton("Reset",self.resetConfigs)]))
+                self.bindFunctionToButton("Clear",self.clearConfigs)]))
         vbox.addWidget(self.addWidgetsInHBox([initLabel, self.initq, goalLabel, self.goalq]))
         self.configTree = QtGui.QTreeWidget()
 
@@ -230,17 +115,13 @@ class _RbprmPath (QtGui.QWidget):
         self.spiny.valueChanged.connect(lambda: self.setConfigPos(self.spiny.value, 1))
         self.spinz.valueChanged.connect(lambda: self.setConfigPos(self.spinz.value, 2))
 
-        #TODO: add tree element to show current set init and goal configs?
-        self.resetConfigs() # --> calls self.update()
-        #self.update ()
+        self.update ()
 
     def update(self):
-        self.ROMlist.clear()
         self.ROMaffList.clear()
         self.ROMaffFilterList.clear()
         ROMnames = self.plugin.rbprmClient.rbprm.getROMnames ()
         for name in ROMnames:
-            self.ROMlist.addItem (name)
             self.ROMaffList.addItem (name)
         filters = self.plugin.rbprmClient.rbprm.getFilter ()
         for fi in filters:
@@ -254,14 +135,18 @@ class _RbprmPath (QtGui.QWidget):
                     item.addChild(child)
             self.ROMaffFilterList.addTopLevelItem(item)
             self.ROMaffFilterList.expandItem(item)
-        self.ROMfilterList.clear()
-        filters = self.plugin.rbprmClient.rbprm.getFilter ()
-        for fi in filters:
-            self.ROMfilterList.addItem(fi)
         self.affTypeList.clear()
+        self.affAnalysisOptions.clear()
         affs = self.getAffordanceConfigTypes ()
+        self.affAnalysisOptions.addItem ("All types")
         for aff in affs:
             self.affTypeList.addItem(aff)
+            self.affAnalysisOptions.addItem (aff)
+        self.affAnalysisObjects.clear ()
+        objects = self.plugin.basicClient.obstacle.getObstacleNames(False,True)
+        self.affAnalysisObjects.addItem ("All objects")
+        for obj in objects:
+            self.affAnalysisObjects.addItem (obj)
         self.configTree.clear()
         if (self.initConfigSet):
             item = QtGui.QTreeWidgetItem()
@@ -338,17 +223,12 @@ class _RbprmPath (QtGui.QWidget):
                 self.plugin.builder.boundSO3(quatbounds)
                 self.plugin.SO3bounds = quatbounds
 
-    def loadModel (self, name, urdfName, urdfNameroms, rootJointType, meshPackageName,\
-            packageName, urdfSuffix, srdfSuffix):
-            if(isinstance(urdfNameroms, list)):    
-                for urdfNamerom in urdfNameroms:
-                    self.plugin.rbprmClient.rbprm.loadRobotRomModel(urdfNamerom, rootJointType,\
-                            packageName, urdfNamerom, urdfSuffix, srdfSuffix)
-            else:
-                self.plugin.rbprmClient.rbprm.loadRobotRomModel(urdfNameroms, rootJointType,\
-                        packageName, urdfNameroms, urdfSuffix, srdfSuffix)
-            self.plugin.rbprmClient.rbprm.loadRobotCompleteModel(name, rootJointType, packageName,\
-                    urdfName, urdfSuffix, srdfSuffix)
+    def Affordance (self):
+        self.affdialog = _AffDialog(self.plugin)
+        if self.affdialog.exec_():
+            config = [self.affdialog.nm.value, self.affdialog.ntm.value, self.affdialog.ma.value]
+            name = str(self.affdialog.affordanceTypes.currentText)
+            self.plugin.affClient.affordance.setAffordanceConfig (name, config)
 
     def clearFilters (self):
         ROMnames = []
@@ -372,9 +252,6 @@ class _RbprmPath (QtGui.QWidget):
         for item in items:
             self.plugin.rbprmClient.rbprm.setAffordanceFilter(str(item.text()), affNames)
         self.update()
-
-    def getAffordanceConfigTypes (self):
-        return self.plugin.affClient.affordance.getAffordanceConfigTypes ()
 
     def addToViewer (self):
         self.ps = ProblemSolver(self.plugin.builder)
@@ -422,13 +299,6 @@ class _RbprmPath (QtGui.QWidget):
             self.plugin.basicClient.problem.resetGoalConfigs()
         self.update()
 
-    def resetConfigs (self):
-        initq = "-2, 0, 0.63, 1, 0, 0, 0"
-        goalq = "3, 0, 0.63, 1, 0, 0, 0"
-        self.initq.setText(initq)
-        self.goalq.setText(goalq)
-        self.update()
-
     def qvector2float (self, p):
         conf =  [p.x(), p.y(), p.z()]
         return conf
@@ -471,6 +341,169 @@ class _RbprmPath (QtGui.QWidget):
 
     def setChooseWithMouse (self):
         self.plugin.chooseWithMouse = True
+
+    def colour_picker (self):
+        colour = QtGui.QColorDialog.getColor()
+        self.colour= [colour.redF(), colour.greenF(), colour.blueF(), colour.alphaF()]
+        colourInt = [colour.red(), colour.green(), colour.blue(), colour.alpha()]
+        colour = str(colourInt); colour = colour.replace("[",""); colour = colour.replace("]","")
+        self.colourBox.setStyleSheet("background-color: rgba("+colour+")")
+
+    def createGroup (self):
+        self.plugin.client.gui.createGroup(str(self.nodeName.text))
+        self.groupNodes.addItem(self.nodeName.text)
+        self.refreshBodyTree()
+
+    def addToGroup (self):
+        self.plugin.client.gui.addToGroup(str(self.nodeName.text), str(self.groupNodes.currentText))
+        self.refreshBodyTree()
+
+    def affordanceAnalysis (self):
+        objectname = str(self.affAnalysisObjects.currentText)
+        affType = str(self.affAnalysisOptions.currentText)
+        if objectname == "All objects":
+            objectname = ""
+            self.plugin.affClient.affordance.analyseAll ()
+        else:
+            self.plugin.affClient.affordance.analyseObject (objectname)
+        if affType == "All types":
+            affordances = self.getAffordanceTypes ()
+            for aff in affordances:
+                 self.visualiseAffordances(aff, self.colour, objectname)
+        else:
+            self.visualiseAffordances(affType, self.colour, objectname)
+        self.update ()
+
+    def getAffordancePoints (self, affordanceType):
+        return self.plugin.affClient.affordance.getAffordancePoints (affordanceType)
+
+    def visualiseAllAffordances (self, affType, colour):
+        if len(colour) < 4 : # if the colour is only rgb we suppose alpha = 1 
+          colour = colour + [1]
+        self.deleteNode (str (affType), True)
+        objs = self.getAffordancePoints (affType)
+        refs = self.getAffRefObstacles (affType)
+        self.plugin.client.gui.createGroup (str (affType))
+        # TODO: add to groupNodes / refresh Body tree?
+        for aff in objs:
+          count = 0
+          for tri in aff:
+            self.plugin.client.gui.addTriangleFace (str (affType) + '-' + \
+                 str (refs[objs.index (aff)]) + '.' + \
+                 str (objs.index (aff)) + '.' + str(count), \
+                 tri[0], tri[1], tri[2], [colour[0], colour[1], colour[2], colour[3]])
+            self.plugin.client.gui.addToGroup (str (affType) + '-' + \
+                 str (refs[objs.index (aff)]) + '.' + \
+                 str (objs.index (aff)) + '.' + str(count), str (affType))
+            count += 1
+        scenes = self.plugin.client.gui.getSceneList() #TODO: add check to see whether scenes is empty
+        groupNodes = self.plugin.client.gui.getGroupNodeList("hpp-gui")
+        self.plugin.client.gui.addToGroup (str (affType), "hpp-gui")
+        # By default, oldest node is displayed in front. Removing and re-adding
+        # object from scene assure that the new triangles are displayed on top     
+        for groupNode in groupNodes :
+            self.plugin.client.gui.removeFromGroup(groupNode, "hpp-gui")
+            self.plugin.client.gui.addToGroup(groupNode, "hpp-gui")
+
+    def visualiseAffordances (self, affType, colour, obstacleName=""):
+        if len(colour) < 4 : # if the colour is only rgb we suppose alpha = 1 
+          colour = colour + [1]
+        if obstacleName == "":
+          return self.visualiseAllAffordances (affType, colour)
+        else:
+          self.deleteAffordancesByTypeFromViewer (affType, obstacleName)
+          nodes = self.plugin.client.gui.getNodeList ()
+          if affType not in nodes: self.plugin.client.gui.createGroup (str (affType))
+          objs = self.getAffordancePoints (affType)
+          refs = self.getAffRefObstacles (affType)
+          for aff in objs:
+            if refs[objs.index (aff)] == obstacleName:
+              count = 0
+              for tri in aff:
+                name = str (affType) + '-' + \
+                str (refs[objs.index (aff)]) + '.' + \
+         str (objs.index (aff)) + '.' + str(count)
+                self.plugin.client.gui.addTriangleFace (name, \
+                    tri[0], tri[1], tri[2], [colour[0], colour[1], colour[2], colour[3]])
+                self.plugin.client.gui.addToGroup (name, str (affType))
+                count += 1
+          scenes = self.plugin.client.gui.getSceneList() #TODO: add check to see whether scenes is empty
+          groupNodes = self.plugin.client.gui.getGroupNodeList('hpp-gui')
+          self.plugin.client.gui.addToGroup (str (affType), 'hpp-gui')
+          # By default, oldest node is displayed in front. Removing and re-adding i
+          # object from scene assure that the new triangles are displayed on top     
+          for groupNode in groupNodes :
+              self.plugin.client.gui.removeFromGroup(groupNode,'hpp-gui')
+              self.plugin.client.gui.addToGroup(groupNode,'hpp-gui')
+
+    def deleteNode (self, nodeName, all):
+        return self.plugin.client.gui.deleteNode (nodeName, all)
+
+    def getAffordanceTypes (self):
+        return self.plugin.affClient.affordance.getAffordanceTypes ()
+
+    def getAffordanceConfigTypes (self):
+        return self.plugin.affClient.affordance.getAffordanceConfigTypes ()
+
+    def getAffRefObstacles (self, affType):
+        return self.plugin.affClient.affordance.getAffRefObstacles (affType)
+
+    def deleteAffordances (self, obstacleName=""):
+        self.deleteAffordancesFromViewer (obstacleName)
+        return self.plugin.affClient.affordance.deleteAffordances (obstacleName)
+
+    def deleteAffordancesFromViewer (self, obstacleName=""):
+        affs = self.getAffordanceTypes ()
+        if obstacleName == "":
+            for aff in affs:
+                self.deleteNode (aff, True)
+        else:
+           import re
+           for aff in affs:
+             refs = self.getAffRefObstacles (aff)
+             count = 0
+             while count < len(refs):
+               if refs[count] == obstacleName:
+                 toDelete = aff + '-' + refs[count]
+                 nodes = self.plugin.client.gui.getGroupNodeList(aff)
+                 for node in nodes:
+                   splt = re.split ('\.', node)
+                   if splt[0] == toDelete:
+                     self.deleteNode (node, True)
+               count += 1
+
+    def deleteAffordancesByType (self):
+        objectname = str(self.deleteObjects.currentText)
+        affType = str(self.deleteAffs.currentText)
+        if objectname == "All objects":
+            objectname = ""
+        if affType == "All types":
+            affType == ""
+            self.plugin.affClient.affordance.deleteAffordances(objectname)
+        else:
+            self.deleteAffordancesByTypeFromViewer (affType, objectname)
+            self.plugin.affClient.affordance.deleteAffordancesByType (affType, objectname)
+        self.update ()
+
+    def deleteAffordancesByTypeFromViewer (self, affordanceType, obstacleName=""):
+        if obstacleName == "":
+          self.deleteNode (affordanceType, True)
+        else:
+           import re
+           affs = self.getAffordanceTypes ()
+           for aff in affs:
+             if aff == affordanceType:
+               refs = self.getAffRefObstacles (aff)
+               count = 0
+               while count < len(refs):
+                 if refs[count] == obstacleName:
+                   toDelete = aff + '-' + refs[count]
+                   nodes = self.plugin.client.gui.getNodeList()
+                   for node in nodes:
+                     splt = re.split ('\.', node)
+                     if splt[0] == toDelete:
+                       self.deleteNode (node, True)
+                 count += 1
 
 class _BoundsDialog(QtGui.QDialog):
     def __init__(self, plugin, parent=None):
@@ -902,83 +935,82 @@ class _FullBodyDialog (_RobotDialog):
         self.envText6.setHidden(True)
         self.urdfromName.setHidden(True)
 
-### This class represents one special tab of the new QDockWidget
+class _AffDialog(QtGui.QDialog):
+    def __init__(self, plugin, parent=None):
+        super(_AffDialog, self).__init__(parent)
+        self.plugin = plugin
+        self.grid = QtGui.QGridLayout()
+        self.grid.setSpacing(10)
+        self.setGeometry(440,418, 450, 450)
+        self.setWindowTitle('Affordance settings')
+        # Create widgets
+        self.affordanceTypes = QtGui.QComboBox(self)
+        
+        self.ntm = QtGui.QDoubleSpinBox()
+        self.ntm.setRange(0,1)
+        self.nm = QtGui.QDoubleSpinBox()
+        self.nm.setRange(0,1)
+        self.ma = QtGui.QDoubleSpinBox()
+        self.ma.setRange(0,10)
+
+        self.ntm.setSingleStep (0.01)
+        self.nm.setSingleStep (0.01)
+        self.ma.setSingleStep (0.01)
+        self.ntm.setValue (0.03)
+        self.nm.setValue (0.03)
+        self.ma.setValue (0.05)
+        text1 = QtGui.QLabel('Affordance type')
+        text2 = QtGui.QLabel('Neighbouring-triangle margin')
+        text3 = QtGui.QLabel('Normal margin')
+        text4 = QtGui.QLabel('Minimum area')
+        self.OKbutton = QtGui.QPushButton("Change Settings")
+        self.CANCELbutton = QtGui.QPushButton("Cancel")
+        # add widgets to grid
+        self.grid.addWidget (text1, 0,0)
+        self.grid.addWidget (self.affordanceTypes, 0,1)
+        self.grid.addWidget (text2, 1,0)
+        self.grid.addWidget (self.ntm, 1,1)
+        self.grid.addWidget (text3, 2,0)
+        self.grid.addWidget (self.nm, 2,1)
+        self.grid.addWidget (text4, 3,0)
+        self.grid.addWidget (self.ma, 3,1)
+        self.grid.addWidget (self.CANCELbutton, 4,0)
+        self.grid.addWidget (self.OKbutton, 4,1)
+
+        # Set dialog layout
+        self.setLayout(self.grid)
+        self.OKbutton.clicked.connect(self.load)
+        self.CANCELbutton.clicked.connect(self.cancel)
+        self.update()
+
+    def update(self):
+        self.affordanceTypes.clear()
+        affordances = self.getAffordanceConfigTypes()
+        for aff in affordances:
+            self.affordanceTypes.addItem (aff)
+
+    def getAffordanceConfigTypes (self):
+        return self.plugin.affClient.affordance.getAffordanceConfigTypes ()
+
+    def load (self):
+            self.accept()
+    def cancel (self):
+            self.reject()
+
+#------------------------------------------------------------------end _Dialogs
+
+#------------------------------------------------------------------start _AffCreator
 class _AffCreator (QtGui.QWidget):
     def __init__(self, parent, plugin):
         super(_AffCreator, self).__init__ (parent)
         self.plugin = plugin
+        self.initConfigSet = False
+        self.plugin.SO3bounds = [1,0,1,0,1,0]
+        self.configs = []
         vbox1 = QtGui.QVBoxLayout(self)
-        # vbox1.setGeometry(QtCore.QRect(1000,1000,1000,1000))
-        # vbox1.setSpacing(20)
         gridW = QtGui.QWidget()#(self)
         grid = QtGui.QGridLayout(gridW)
         
-        #hbox1.setSpacing (0) #no effect
-        #box.setMargin(0)
-        #self.affMargin.setAlignment(Qt.Qt.AlignLeft)
-        
-        # Affordance Types
-        self.affordanceTypes = QtGui.QComboBox(self)
-        self.affordanceTypes.editable = False
-        self.affordanceTypes.setMaximumWidth(100)
-        affTypeLabel = QtGui.QLabel("Affordance Type:")
-        affTypeLabel.setMaximumWidth(200)
-
-        grid.addWidget(self.addWidgetsInHBox( [affTypeLabel,
-            self.affordanceTypes]), 0,0)
-
-        # Affordance Creation by Name
-        self.affMargin = QtGui.QDoubleSpinBox() 
-        self.affMargin.setValue (0.03)
-        self.affMargin.setMaximumWidth(100)
-        marginLabel = QtGui.QLabel("Normal Margin:")
-        marginLabel.setMaximumWidth(200)
-        grid.addWidget(self.addWidgetsInHBox([marginLabel, self.affMargin]), 1,0)
-        self.affNTriMargin = QtGui.QDoubleSpinBox()
-        self.affNTriMargin.setValue (0.03)
-        self.affNTriMargin.setMaximumWidth(100)
-        nTMarginLabel = QtGui.QLabel("Neighbour-Triangle Margin:")
-        nTMarginLabel.setMaximumWidth(200)
-        grid.addWidget(self.addWidgetsInHBox([nTMarginLabel, self.affNTriMargin]), 0,1)
-        self.affMinArea = QtGui.QDoubleSpinBox()
-        self.affMinArea.setValue (0.05)
-        self.affMinArea.setMaximumWidth(100)
-        areaLabel = QtGui.QLabel("Minimum Area:")
-        areaLabel.setMaximumWidth(200)
-        grid.addWidget(self.addWidgetsInHBox([areaLabel, self.affMinArea]), 1,1)
-        
-        vbox1.addWidget(gridW)
-
-        # Add Affordance Configuration
-        vbox1.addWidget(self.bindFunctionToButton("Edit", self.setAffConfig))
-        # Affordance Analysis Button
-        self.affAnalysisObjects = QtGui.QComboBox(self)
-        self.affAnalysisObjects.editable = False
-        self.affAnalysisOptions = QtGui.QComboBox(self)
-        self.affAnalysisOptions.editable = False
-       
-        self.colour = [0.7450980392156863, 1.0, 0.3333333333333333, 1]
-        self.affColour = QtGui.QAction('Font bg Color', self)
-        self.affColour.triggered.connect(self.colour_picker)
-
-        vbox1.addWidget(self.addWidgetsInHBox( [
-            QtGui.QLabel("Object:"), self.affAnalysisObjects,
-            QtGui.QLabel("Affordance type:"), self.affAnalysisOptions]))
-
-        self.colourButton = self.bindFunctionToButton("Choose Colour", self.colour_picker)
-        vbox1.addWidget(self.colourButton)
-      #  self.colorButton = _QColorButton("Choose colour")
-      #  vbox1.addWidget(self.colorButton)
-        vbox1.addWidget(self.bindFunctionToButton("Find Affordances", self.affordanceAnalysis))
-
-        self.deleteObjects = QtGui.QComboBox(self)
-        self.deleteObjects.editable = False
-        self.deleteAffs = QtGui.QComboBox(self)
-        self.deleteAffs.editable = False
-        vbox1.addWidget(self.addWidgetsInHBox( [
-            QtGui.QLabel("Object:"), self.deleteObjects,
-            QtGui.QLabel("Affordance type:"), self.deleteAffs]))
-        vbox1.addWidget(self.bindFunctionToButton("Delete Affordances", self.deleteAffordancesByType))
         self.groupbox = QtGui.QGroupBox()
         self.grid2 = QtGui.QGridLayout(self.groupbox)
         optimiserLabel = QtGui.QLabel("Choose Path Optimisers:")
@@ -1006,30 +1038,36 @@ class _AffCreator (QtGui.QWidget):
         self.grid2.addWidget(self.validate, 5,1)
         self.grid2.addWidget(self.clearOptimisers, 5,0)
         vbox1.addWidget(self.groupbox)
-        vbox1.addWidget(self.bindFunctionToButton("Solve", self.solve))
-        self.update()
+        self.colourBox = QtGui.QGroupBox()
+        self.solveStatus = QtGui.QLabel()
+        self.solveStatus.setAlignment(QtCore.Qt.AlignCenter)
+        self.solveStatus.setStyleSheet("background-color: blue")
+        vbox1.addWidget(self.addWidgetsInHBox([self.bindFunctionToButton("Solve", self.solve),\
+                self.solveStatus]))
+
+    #    robotLabel = QtGui.QLabel("Set up rbprm models:")
+    #    vbox.addWidget(robotLabel)
+        self.computeStatus = QtGui.QLabel()
+        self.computeStatus.setAlignment(QtCore.Qt.AlignCenter)
+        self.computeStatus.setStyleSheet("background-color: blue")
+        vbox1.addWidget(self.addWidgetsInHBox([self.bindFunctionToButton("Load full-body model",\
+                self.Fullbody), self.bindFunctionToButton("Load limb models", self.Limb)]))
+        vbox1.addWidget(self.addWidgetsInHBox([self.bindFunctionToButton("Compute contacts",\
+                self.computeContacts), self.computeStatus]))
+        self.slider = QtGui.QSlider(QtCore.Qt.Horizontal)
+        self.slider.setMinimum(1)
+        self.slider.setMaximum(10)
+        self.slider.setValue(1)
+        self.slider.setTickInterval(1)
+        vbox1.addWidget(self.slider)
+
+        
+        self.slider.valueChanged.connect(self.draw)
+        
+        vbox1 = QtGui.QVBoxLayout(self)
+        self.update ()
 
     def update(self):
-        self.affordanceTypes.clear()
-        self.affAnalysisOptions.clear()
-        affordances = self.getAffordanceConfigTypes()
-        for aff in affordances:
-            self.affordanceTypes.addItem (aff)
-            self.affAnalysisOptions.addItem (aff)
-        self.affAnalysisOptions.addItem ("All types")
-        self.affAnalysisObjects.clear ()
-        self.deleteObjects.clear ()
-        objects = self.plugin.basicClient.obstacle.getObstacleNames(False,True)
-        for obj in objects:
-            self.affAnalysisObjects.addItem (obj)
-            self.deleteObjects.addItem (obj)
-        self.affAnalysisObjects.addItem ("All objects")
-        self.deleteObjects.addItem ("All objects")
-        self.deleteAffs.clear ()
-        affordances = self.getAffordanceTypes()
-        for aff in affordances:
-            self.deleteAffs.addItem (aff)
-        self.deleteAffs.addItem ("All types")
         opts = self.plugin.basicClient.problem.getAvailable("PathOptimizer")
         vals = self.plugin.basicClient.problem.getAvailable("PathValidation")
         shs = self.plugin.basicClient.problem.getAvailable("ConfigurationShooter")
@@ -1037,25 +1075,25 @@ class _AffCreator (QtGui.QWidget):
         self.chosenOptimiserList.clear()
         self.validations.clear()
         self.shooters.clear()
+        item = []
         for opt in opts:
-            self.optimiserList.addItem(opt)
+            item = QtGui.QListWidgetItem (opt)
+            self.optimiserList.addItem(item)
+        self.optimiserList.setCurrentItem(item)
         for val in vals:
             self.validations.addItem(val)
+        self.validations.setCurrentIndex(vals.index(val))
         for sh in shs:
             self.shooters.addItem(sh)
+        self.shooters.setCurrentIndex(shs.index(sh))
 
+        self.slider.setMaximum(len(self.configs)-1)
+        
     def addWidgetsInHBox(self, widgets):
         nameParentW = QtGui.QWidget(self)
         hboxName = QtGui.QHBoxLayout(nameParentW)
         for w in widgets:
             hboxName.addWidget(w)
-        return nameParentW
-
-    def addWidgetsInVBox(self, widgets):
-        nameParentW = QtGui.QWidget(self)
-        vboxName = QtGui.QVBoxLayout(nameParentW)
-        for w in widgets:
-            vboxName.addWidget(w)
         return nameParentW
 
     def bindFunctionToButton (self, buttonLabel, func):
@@ -1064,184 +1102,86 @@ class _AffCreator (QtGui.QWidget):
         button.connect ('clicked()', func)
         return button
 
-    def colour_picker (self):
-        colour = QtGui.QColorDialog.getColor()
-        self.colour = [colour.redF(), colour.greenF(), colour.blueF(), colour.alphaF()]
-        self.colourButton.setStyleSheet("background-color: %s;" % self.colour)
+    def Fullbody (self):
+        self.fbdialog = _FullBodyDialog()
+        if self.fbdialog.exec_():
+            name = str(self.fbdialog.Envname.text)
+            packageName = str(self.fbdialog.pkgName.text)
+            urdfName =  str(self.fbdialog.urdfName.text)
+            meshPackageName = str(self.fbdialog.mpkgName.text)
+            rootJointType = str(self.fbdialog.rootJoint.currentText)
+            urdfSuffix = str(self.fbdialog.urdfSuf.text)
+            srdfSuffix = str(self.fbdialog.srdfSuf.text)
+            self.plugin.fullbody.loadFullBodyModel (urdfName, rootJointType,\
+                    meshPackageName, packageName, urdfSuffix, srdfSuffix)
+            self.addToViewer()
+        self.update()
 
-    def addMesh (self):
-        filename = QtGui.QFileDialog.getOpenFileName (self, "Choose a mesh")
-        self.plugin.client.gui.addMesh(str(self.nodeName.text), str(filename))
-        self.refreshBodyTree()
+    def Limb (self):
+        self.limbdialog = _LimbDialog()
+        if self.limbdialog.exec_():
+            tabs = self.limbdialog.tabs
+            self.legIds = []
+            for tab in tabs:
+                legId = str(tab.legId.text)
+                self.legIds.append(legId)
+                cType = str(tab.cType.currentText)
+                leg = str(tab.leg.text)
+                foot = str(tab.foot.text)
+                offset = self.str2float(str(tab.offset.text))
+                normal = self.str2float(str(tab.normal.text))
+                legxlegy = self.str2float(str(tab.legxlegy.text))
+                nbSamples = int(tab.nbSamples.value)
+                heuristic = str(tab.heur.currentText)
+                resolution = float(tab.res.value)
+                self.plugin.fullbody.addLimb(legId,leg,foot,offset,normal, legxlegy[0],\
+                        legxlegy[1], nbSamples, heuristic, resolution, cType)
+        self.update()
 
-    def addBox (self):
-        self.plugin.client.gui.addBox(str(self.nodeName.text), 1, 1, 1, self.colour)
-        self.refreshBodyTree()
+    def computeContacts (self):
+        self.computeStatus.setText("Computing")
+        self.computeStatus.setStyleSheet("background-color: yellow")
+        q_init = self.plugin.fullbody.getCurrentConfig()
+        q_init[0:7] = self.plugin.rbprmPath.q_init[0:7]
+        q_goal = self.plugin.fullbody.getCurrentConfig();
+        q_goal[0:7] = self.plugin.rbprmPath.q_goal[0:7]
+        self.plugin.fullbody.setCurrentConfig (q_init)
+        self.q_init = self.plugin.fullbody.generateContacts(q_init, [0,0,1])
+        self.plugin.fullbody.setCurrentConfig (q_goal)
+        self.q_goal = self.plugin.fullbody.generateContacts(q_goal, [0,0,1])
+        self.plugin.fullbody.setStartState(q_init,[])
+        self.plugin.fullbody.setEndState(q_goal,self.legIds)
+        self.r(q_init)
+        self.configs = self.plugin.fullbody.interpolate(0.1, 1, 0)
+        self.computeStatus.setText("Done")
+        self.computeStatus.setStyleSheet("background-color: green")
+        self.update()
 
-    def createGroup (self):
-        self.plugin.client.gui.createGroup(str(self.nodeName.text))
-        self.groupNodes.addItem(self.nodeName.text)
-        self.refreshBodyTree()
+    def addToViewer (self):
+        self.ps = ProblemSolver(self.plugin.fullbody)
+        self.r = Viewer(self.ps)
 
-    def addToGroup (self):
-        self.plugin.client.gui.addToGroup(str(self.nodeName.text), str(self.groupNodes.currentText))
-        self.refreshBodyTree()
+    def str2float (self,text):
+        str1 = str(text).replace(" ", "")
+        str2 = str1.split(',')
+        flist = []
+        for s in str2:
+            flist.append(float(s))
+        return flist
+    
+    def draw(self, i):
+        if len(self.configs) > 0:
+            config = self.configs[i]
+            self.plugin.fullbody.draw(config, self.r)
 
-    def setAffConfig (self):
-        config = [self.affMargin.value, self.affNTriMargin.value, self.affMinArea.value]
-        self.plugin.affClient.affordance.setAffordanceConfig (str(self.affordanceTypes.currentText), config)
-
-    def affordanceAnalysis (self):
-        objectname = str(self.affAnalysisObjects.currentText)
-        affType = str(self.affAnalysisOptions.currentText)
-        if objectname == "All objects":
-            objectname = ""
-            self.plugin.affClient.affordance.analyseAll ()
+    def showConfig(self):
+        if str(self.configCombo.currentText) == 'initial':
+            q = self.str2float(self.initq.text)
         else:
-            self.plugin.affClient.affordance.analyseObject (objectname)
-        if affType == "All types":
-            affordances = self.getAffordanceTypes ()
-            for aff in affordances:
-                 self.visualiseAffordances(aff, self.colour, objectname)
-        else:
-            self.visualiseAffordances(affType, self.colour, objectname)
-        self.update ()
-
-    def getAffordancePoints (self, affordanceType):
-        return self.plugin.affClient.affordance.getAffordancePoints (affordanceType)
-
-    def visualiseAllAffordances (self, affType, colour):
-        if len(colour) < 4 : # if the colour is only rgb we suppose alpha = 1 
-          colour = colour + [1]
-        self.deleteNode (str (affType), True)
-        objs = self.getAffordancePoints (affType)
-        refs = self.getAffRefObstacles (affType)
-        self.plugin.client.gui.createGroup (str (affType))
-        # TODO: add to groupNodes / refresh Body tree?
-        for aff in objs:
-          count = 0
-          for tri in aff:
-            self.plugin.client.gui.addTriangleFace (str (affType) + '-' + \
-                 str (refs[objs.index (aff)]) + '.' + \
-                 str (objs.index (aff)) + '.' + str(count), \
-                 tri[0], tri[1], tri[2], [colour[0], colour[1], colour[2], colour[3]])
-            self.plugin.client.gui.addToGroup (str (affType) + '-' + \
-                 str (refs[objs.index (aff)]) + '.' + \
-                 str (objs.index (aff)) + '.' + str(count), str (affType))
-            count += 1
-        scenes = self.plugin.client.gui.getSceneList() #TODO: add check to see whether scenes is empty
-        groupNodes = self.plugin.client.gui.getGroupNodeList("hpp-gui")
-        self.plugin.client.gui.addToGroup (str (affType), "hpp-gui")
-        # By default, oldest node is displayed in front. Removing and re-adding
-        # object from scene assure that the new triangles are displayed on top     
-        for groupNode in groupNodes :
-            self.plugin.client.gui.removeFromGroup(groupNode, "hpp-gui")
-            self.plugin.client.gui.addToGroup(groupNode, "hpp-gui")
-
-    def visualiseAffordances (self, affType, colour, obstacleName=""):
-        if len(colour) < 4 : # if the colour is only rgb we suppose alpha = 1 
-          colour = colour + [1]
-        if obstacleName == "":
-          return self.visualiseAllAffordances (affType, colour)
-        else:
-          self.deleteAffordancesByTypeFromViewer (affType, obstacleName)
-          nodes = self.plugin.client.gui.getNodeList ()
-          if affType not in nodes: self.plugin.client.gui.createGroup (str (affType))
-          objs = self.getAffordancePoints (affType)
-          refs = self.getAffRefObstacles (affType)
-          for aff in objs:
-            if refs[objs.index (aff)] == obstacleName:
-              count = 0
-              for tri in aff:
-                name = str (affType) + '-' + \
-                str (refs[objs.index (aff)]) + '.' + \
-         str (objs.index (aff)) + '.' + str(count)
-                self.plugin.client.gui.addTriangleFace (name, \
-                    tri[0], tri[1], tri[2], [colour[0], colour[1], colour[2], colour[3]])
-                self.plugin.client.gui.addToGroup (name, str (affType))
-                count += 1
-          scenes = self.plugin.client.gui.getSceneList() #TODO: add check to see whether scenes is empty
-          groupNodes = self.plugin.client.gui.getGroupNodeList('hpp-gui')
-          self.plugin.client.gui.addToGroup (str (affType), 'hpp-gui')
-          # By default, oldest node is displayed in front. Removing and re-adding i
-          # object from scene assure that the new triangles are displayed on top     
-          for groupNode in groupNodes :
-              self.plugin.client.gui.removeFromGroup(groupNode,'hpp-gui')
-              self.plugin.client.gui.addToGroup(groupNode,'hpp-gui')
-
-    def deleteNode (self, nodeName, all):
-        return self.plugin.client.gui.deleteNode (nodeName, all)
-
-    def getAffordanceTypes (self):
-        return self.plugin.affClient.affordance.getAffordanceTypes ()
-
-    def getAffordanceConfigTypes (self):
-        return self.plugin.affClient.affordance.getAffordanceConfigTypes ()
-
-    def getAffRefObstacles (self, affType):
-        return self.plugin.affClient.affordance.getAffRefObstacles (affType)
-
-    def deleteAffordances (self, obstacleName=""):
-        self.deleteAffordancesFromViewer (obstacleName)
-        return self.plugin.affClient.affordance.deleteAffordances (obstacleName)
-
-    def deleteAffordancesFromViewer (self, obstacleName=""):
-        affs = self.getAffordanceTypes ()
-        if obstacleName == "":
-            for aff in affs:
-                self.deleteNode (aff, True)
-        else:
-           import re
-           for aff in affs:
-             refs = self.getAffRefObstacles (aff)
-             count = 0
-             while count < len(refs):
-               if refs[count] == obstacleName:
-                 toDelete = aff + '-' + refs[count]
-                 nodes = self.plugin.client.gui.getGroupNodeList(aff)
-                 for node in nodes:
-                   splt = re.split ('\.', node)
-                   if splt[0] == toDelete:
-                     self.deleteNode (node, True)
-               count += 1
-
-    def deleteAffordancesByType (self):
-        objectname = str(self.deleteObjects.currentText)
-        affType = str(self.deleteAffs.currentText)
-        if objectname == "All objects":
-            objectname = ""
-        if affType == "All types":
-            affType == ""
-            self.plugin.affClient.affordance.deleteAffordances(objectname)
-        else:
-            self.deleteAffordancesByTypeFromViewer (affType, objectname)
-            self.plugin.affClient.affordance.deleteAffordancesByType (affType, objectname)
-        self.update ()
-
-    def deleteAffordancesByTypeFromViewer (self, affordanceType, obstacleName=""):
-        if obstacleName == "":
-          self.deleteNode (affordanceType, True)
-        else:
-           import re
-           affs = self.getAffordanceTypes ()
-           for aff in affs:
-             if aff == affordanceType:
-               refs = self.getAffRefObstacles (aff)
-               count = 0
-               while count < len(refs):
-                 if refs[count] == obstacleName:
-                   toDelete = aff + '-' + refs[count]
-                   nodes = self.plugin.client.gui.getNodeList()
-                   for node in nodes:
-                     splt = re.split ('\.', node)
-                     if splt[0] == toDelete:
-                       self.deleteNode (node, True)
-                 count += 1
-
-
-    ## See gepetto::gui::MainWindow::requestRefresh for more information
-    def refreshBodyTree(self):
-        self.plugin.main.requestRefresh()
+            q = self.str2float(self.goalq.text)
+        if len(q) == self.plugin.basicClient.robot.getConfigSize():
+            self.r (q)
+        self.update()
 
     def validateSettings (self):
         self.plugin.basicClient.problem.addPathOptimizer (str(self.optimiserList.currentItem().text()))
@@ -1254,8 +1194,13 @@ class _AffCreator (QtGui.QWidget):
         self.update()
 
     def solve (self):
+        self.solveStatus.setText("Solving")
+        self.solveStatus.setStyleSheet("background-color: yellow")
         self.plugin.basicClient.problem.solve()
+        self.solveStatus.setText("Done")
+        self.solveStatus.setStyleSheet("background-color: green")
         self.update()
+#------------------------------------------------------------------end _AffCreator
 
 class Plugin(QtGui.QDockWidget):
     """
@@ -1272,7 +1217,6 @@ class Plugin(QtGui.QDockWidget):
         self.fullbody = FullBody ()
         self.basicClient  = basicClient ()
         self.affClient = affClient ()
-        #action = self.addAction("Affo")
         #action.setShortcut(QtGui.QKeySequence("Shift+Alt+A"))
         #self.mainWindow.actionExit.setShortcut('Ctrl+Alt+A')
         #self.mainWindow.actionExit.setStatusTip(_('Open affordance plugin'))
@@ -1283,12 +1227,13 @@ class Plugin(QtGui.QDockWidget):
         self.rbprmPath = _RbprmPath (self,self)
         self.tabWidget.addTab (self.rbprmPath, "Rbprm Path")
         self.affCreator = _AffCreator(self, self)
-        self.tabWidget.addTab (self.affCreator, "Affordance Creator")
-        self.rbprmInterp = _RbprmInterp (self,self)
-        self.tabWidget.addTab (self.rbprmInterp, "Rbprm Interp")
+        self.tabWidget.addTab (self.affCreator, "Rbprm Interp")
+  #      self.rbprmInterp = _RbprmInterp (self,self)
+  #      self.tabWidget.addTab (self.rbprmInterp, "Rbprm Interp")
         self.main = mainWindow
         mainSize = self.main.size
-        self.tabWidget.setMaximumSize(mainSize.height(), int(float(mainSize.width())*0.9))
+        self.tabWidget.setMaximumSize(int(float(mainSize.width())*0.6), mainSize.height())
+        #self.tabWidget.sizeHint(int(float(mainSize.width())*0.6), mainSize.height())
         mainWindow.connect('refresh()', self.refresh)
         self.chooseWithMouse = False
         self.tabWidget.connect(self.tabWidget, QtCore.SIGNAL("currentChanged(int)"), self.updateSelected)
@@ -1307,9 +1252,10 @@ class Plugin(QtGui.QDockWidget):
         currentWidget.update()
 
     def refresh(self):
+        mainSize = self.main.size
+        self.tabWidget.setMaximumSize(int(float(mainSize.width())*0.6), mainSize.height())
         self.affCreator.update()
         self.rbprmPath.update()
-        self.rbprmInterp.update()
 
     def selected(self, name, posInWorldFrame):
         if (self.chooseWithMouse):
