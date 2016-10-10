@@ -7,6 +7,17 @@ from hpp.corbaserver.rbprm.rbprmbuilder import Builder
 from hpp.corbaserver.rbprm.rbprmfullbody import FullBody
 from hpp.corbaserver.rbprm.problem_solver import ProblemSolver
 from hpp.gepetto import Viewer
+import math
+import time
+
+def magnitude(v):
+    return math.sqrt(sum(v[i]*v[i] for i in range(len(v))))
+
+def normalise(v):
+    vmag = magnitude(v)
+    if vmag == 0.0:
+        vmag = 1.0
+    return [ v[i]/vmag  for i in range(len(v)) ]
 
 ### This class represents one special tab of the new QDockWidget
 class _RbprmPath (QtGui.QWidget):
@@ -16,8 +27,11 @@ class _RbprmPath (QtGui.QWidget):
         self.plugin.chooseWithMouse = False
         self.initConfigSet = False
         self.plugin.SO3bounds = [1,0,1,0,1,0]
-        self.q_init = [0,0,0,1,0,0,0]
-        self.q_goal = [0,0,0,1,0,0,0]
+        self.q_init = [0, 0, 0, 1, 0, 0, 0]
+        self.q_goal = [0, 0, 0, 1, 0, 0, 0]
+        self.lastObject = ""
+        self.lastAff = ""
+        self.analysed = False
         vbox = QtGui.QVBoxLayout(self)
         vbox.addWidget(self.addWidgetsInHBox([self.bindFunctionToButton("Load ROM robot",\
                 self.Robot), self.bindFunctionToButton("Load environment", self.Environment)]))
@@ -79,7 +93,7 @@ class _RbprmPath (QtGui.QWidget):
         vbox.addWidget(self.addWidgetsInHBox([self.clickTick, self.configCombo,\
                 self.bindFunctionToButton("Add",self.addConfig),\
                 self.bindFunctionToButton("Clear",self.clearConfigs)]))
-        vbox.addWidget(self.addWidgetsInHBox([initLabel, self.initq, goalLabel, self.goalq]))
+     #   vbox.addWidget(self.addWidgetsInHBox([initLabel, self.initq, goalLabel, self.goalq]))
         self.configTree = QtGui.QTreeWidget()
 
         self.groupbox = QtGui.QGroupBox()
@@ -91,29 +105,61 @@ class _RbprmPath (QtGui.QWidget):
         self.spinx.setRange(-10,10)
         self.spiny.setRange(-10,10)
         self.spinz.setRange(-10,10)
+        self.spinx.setValue(-2)
+        self.spinz.setValue(0.63)
         label1 = QtGui.QLabel("x")
         label2 = QtGui.QLabel("y")
         label3 = QtGui.QLabel("z")
         self.spinx.setSingleStep (0.01)
         self.spiny.setSingleStep (0.01)
         self.spinz.setSingleStep (0.01)
+        
+        self.quatspinw = QtGui.QDoubleSpinBox ()
+        self.quatspinx = QtGui.QDoubleSpinBox ()
+        self.quatspiny = QtGui.QDoubleSpinBox ()
+        self.quatspinz = QtGui.QDoubleSpinBox ()
+        self.quatspinw.setRange(-10,10)
+        self.quatspinx.setRange(-10,10)
+        self.quatspiny.setRange(-10,10)
+        self.quatspinz.setRange(-10,10)
+        label4 = QtGui.QLabel("w")
+        label5 = QtGui.QLabel("x")
+        label6 = QtGui.QLabel("y")
+        label7 = QtGui.QLabel("z")
+        self.quatspinw.setSingleStep (0.01)
+        self.quatspinx.setSingleStep (0.01)
+        self.quatspiny.setSingleStep (0.01)
+        self.quatspinz.setSingleStep (0.01)
+        self.quatspinw.setValue(1)
         self.grid2.addWidget (label1,0,0)
         self.grid2.addWidget (self.spinx,0,1)
         self.grid2.addWidget (label2,1,0)
         self.grid2.addWidget (self.spiny,1,1)
         self.grid2.addWidget (label3,2,0)
         self.grid2.addWidget (self.spinz,2,1)
-        label4 = QtGui.QLabel("Config validation:")
+        label8 = QtGui.QLabel("Config validation:")
         self.validator = QtGui.QGroupBox()
         self.validator.setStyleSheet("background-color: blue")
-        self.grid2.addWidget (label4,0,2)
-        self.grid2.addWidget (self.validator,1,2,2,1)
+        #self.grid2.addWidget (label8,0,2)
+        self.grid2.addWidget (self.validator,3,1,1,1)
+        self.grid2.addWidget (label4,0,3)
+        self.grid2.addWidget (self.quatspinw,0,4)
+        self.grid2.addWidget (label5,1,3)
+        self.grid2.addWidget (self.quatspinx,1,4)
+        self.grid2.addWidget (label6,2,3)
+        self.grid2.addWidget (self.quatspiny,2,4)
+        self.grid2.addWidget (label7,3,3)
+        self.grid2.addWidget (self.quatspinz,3,4)
         vbox.addWidget(self.addWidgetsInHBox([self.configTree, self.groupbox]))
 
         self.clickTick.clicked.connect(self.setChooseWithMouse)
-        self.spinx.valueChanged.connect(lambda: self.setConfigPos(self.spinx.value, 0))
-        self.spiny.valueChanged.connect(lambda: self.setConfigPos(self.spiny.value, 1))
-        self.spinz.valueChanged.connect(lambda: self.setConfigPos(self.spinz.value, 2))
+        self.spinx.valueChanged.connect(self.showConfig)
+        self.spiny.valueChanged.connect(self.showConfig)
+        self.spinz.valueChanged.connect(self.showConfig)
+        self.quatspinw.valueChanged.connect(self.showConfig)
+        self.quatspinx.valueChanged.connect(self.showConfig)
+        self.quatspiny.valueChanged.connect(self.showConfig)
+        self.quatspinz.valueChanged.connect(self.showConfig)
 
         self.update ()
 
@@ -142,31 +188,36 @@ class _RbprmPath (QtGui.QWidget):
         for aff in affs:
             self.affTypeList.addItem(aff)
             self.affAnalysisOptions.addItem (aff)
+            if (aff == self.lastAff):
+                self.affAnalysisOptions.setCurrentIndex(1 + affs.index(aff))
         self.affAnalysisObjects.clear ()
         objects = self.plugin.basicClient.obstacle.getObstacleNames(False,True)
         self.affAnalysisObjects.addItem ("All objects")
         for obj in objects:
             self.affAnalysisObjects.addItem (obj)
+            if (obj == self.lastObject):
+                self.affAnalysisObjects.setCurrentIndex(1 + objects.index(obj))
         self.configTree.clear()
-        if (self.initConfigSet):
-            item = QtGui.QTreeWidgetItem()
-            item.setText(0,"initial")
-            iq = self.plugin.basicClient.problem.getInitialConfig()    
-            child = QtGui.QTreeWidgetItem()
-            child.setText(0,str(iq))
-            item.addChild(child)
-            self.configTree.addTopLevelItem(item)
-            self.configTree.expandItem(item)
-        gqs = self.plugin.basicClient.problem.getGoalConfigs()
-        if (len(gqs) > 0):
-            item = QtGui.QTreeWidgetItem()
-            item.setText(0,"goal")
-            for gq in gqs:
+        if hasattr(self.plugin.builder, 'name'):
+            if (self.initConfigSet):
+                item = QtGui.QTreeWidgetItem()
+                item.setText(0,"initial")
+                iq = self.plugin.basicClient.problem.getInitialConfig()    
                 child = QtGui.QTreeWidgetItem()
-                child.setText(0,str(gq))
+                child.setText(0,str(iq))
                 item.addChild(child)
-            self.configTree.addTopLevelItem(item)
-            self.configTree.expandItem(item)
+                self.configTree.addTopLevelItem(item)
+                self.configTree.expandItem(item)
+            gqs = self.plugin.basicClient.problem.getGoalConfigs()
+            if (len(gqs) > 0):
+                item = QtGui.QTreeWidgetItem()
+                item.setText(0,"goal")
+                for gq in gqs:
+                    child = QtGui.QTreeWidgetItem()
+                    child.setText(0,str(gq))
+                    item.addChild(child)
+                self.configTree.addTopLevelItem(item)
+                self.configTree.expandItem(item)
         
     def addWidgetsInHBox(self, widgets):
         nameParentW = QtGui.QWidget(self)
@@ -196,17 +247,21 @@ class _RbprmPath (QtGui.QWidget):
             srdfSuffix = str(self.robotdialog.srdfSuf.text)
             self.plugin.builder.loadModel(urdfName, urdfNameRom, rootJointType, \
                     meshPackageName, packageName, urdfSuffix, srdfSuffix)
+            self.plugin.main.createView("window_hpp_") #TODO: find way of adding view of custom name
             self.addToViewer()
         self.update()
 
     def Environment (self):
         self.envdialog = _EnvDialog()
-        if self.envdialog.exec_():
-            name = str(self.envdialog.Envname.text)
-            urdfName =  str(self.envdialog.urdfName.text)
-            packageName = str(self.envdialog.pkgName.text)
-            self.r.loadObstacleModel (packageName, urdfName, name)
-        self.update()
+        if hasattr(self.plugin.builder, 'name'):
+            if self.envdialog.exec_():
+                name = str(self.envdialog.Envname.text)
+                urdfName =  str(self.envdialog.urdfName.text)
+                packageName = str(self.envdialog.pkgName.text)
+                self.r.loadObstacleModel (packageName, urdfName, name)
+            self.update()
+        else:
+            print ("Please load ROM robot before environment.")
 
     def JointBounds (self):
         self.boundsdialog = _BoundsDialog(self.plugin)
@@ -265,29 +320,40 @@ class _RbprmPath (QtGui.QWidget):
             flist.append(float(s))
         return flist
 
-    def showConfig(self, q):
-        if len(q) == self.plugin.basicClient.robot.getConfigSize():
-            self.r (q)
-            if self.plugin.rbprmClient.rbprm.validateConfiguration(q):
-                self.validator.setStyleSheet("background-color: green")
-            else:
-                self.validator.setStyleSheet("background-color: red")
-        self.update()
+    def showConfig(self):
+        if hasattr(self.plugin.builder, 'name'):
+            conf = self.plugin.builder.getCurrentConfig()
+            conf[0:3] = [float(self.spinx.value), float(self.spiny.value), float(self.spinz.value)]
+            conf[3:7] = normalise([float(self.quatspinw.value), float(self.quatspinx.value),\
+                    float(self.quatspiny.value), float(self.quatspinz.value)])
+            self.r (conf)
+            if  self.analysed:
+                if self.plugin.rbprmClient.rbprm.validateConfiguration(conf):
+                    self.validator.setStyleSheet("background-color: green")
+                else:
+                    self.validator.setStyleSheet("background-color: red")
+            self.update()
 
     def addConfig (self):
-        configSize = self.plugin.basicClient.robot.getConfigSize()
+    #    configSize = self.plugin.basicClient.robot.getConfigSize()
+        conf = self.plugin.builder.getCurrentConfig()
+          #  conf = self.str2float(str(self.initq.text))
+        conf = self.plugin.builder.getCurrentConfig()
+        conf[0:3] = [float(self.spinx.value), float(self.spiny.value), float(self.spinz.value)]
+        conf[3:7] = normalise([float(self.quatspinw.value), float(self.quatspinx.value),\
+                    float(self.quatspiny.value), float(self.quatspinz.value)])
+           #== configSize:
         if str(self.configCombo.currentText) == 'initial':
-            conf = self.str2float(str(self.initq.text))
-            if len(conf) == configSize:
-                self.plugin.basicClient.problem.setInitialConfig(conf)
-                self.plugin.builder.setCurrentConfig(conf)
-                self.q_init = conf
-                self.initConfigSet = True
+            self.plugin.basicClient.problem.setInitialConfig(conf)
+            self.plugin.builder.setCurrentConfig(conf)
+            self.q_init = conf
+            self.initConfigSet = True
         else:
-            conf = self.str2float(str(self.goalq.text))
-            if len(conf) == configSize:
-                self.plugin.basicClient.problem.addGoalConfig(conf)
-                self.q_goal = conf
+            #conf = self.str2float(str(self.goalq.text))
+            #if len(conf) == configSize:
+            self.plugin.basicClient.problem.addGoalConfig(conf)
+            self.q_goal = conf
+        self.spinConfig(conf)
         self.update ()
 
     def clearConfigs (self):
@@ -295,6 +361,7 @@ class _RbprmPath (QtGui.QWidget):
             configSize = self.plugin.basicClient.robot.getConfigSize()
             conf = [0]*configSize
             self.plugin.basicClient.problem.setInitialConfig(conf)
+            self.initConfigSet = False
         else:
             self.plugin.basicClient.problem.resetGoalConfigs()
         self.update()
@@ -303,41 +370,17 @@ class _RbprmPath (QtGui.QWidget):
         conf =  [p.x(), p.y(), p.z()]
         return conf
 
-    def spinConfig (self):
-        configSize = self.plugin.basicClient.robot.getConfigSize()
-        if str(self.configCombo.currentText) == 'initial':
-            conf = self.str2float(self.initq.text)
-        else:
-            conf = self.str2float(self.goalq.text)
-        if len(conf) == configSize:
+    def spinConfig (self, conf):
+        if len (conf) > 2:
             self.spinx.setValue(conf[0])
             self.spiny.setValue(conf[1])
             self.spinz.setValue(conf[2])
-
-    def setConfigPos (self, pos, idx):
-        configSize = self.plugin.basicClient.robot.getConfigSize()
-        if str(self.configCombo.currentText) == 'initial':
-            conf = self.str2float(self.initq.text)
-        else:
-            conf = self.str2float(self.goalq.text)
-        # if config input incomplete, assume quat = [1,0,0,0] and other config variables == 0
-        if len(conf) != configSize:
-            conf = [0]*configSize
-            conf[3] = 1
-        if type(pos) == list:
-            conf[0:len(pos)] = pos
-        else:
-            conf[idx] = pos
-        config = str(conf)
-        config = config.replace("[","")
-        config = config.replace("]","")
-        if str(self.configCombo.currentText) == 'initial':
-            self.initq.text = config
-        else:
-            self.goalq.text = config
-        self.showConfig(conf)
-        self.spinConfig()
-        self.update()
+            if len (conf) == 7:
+                self.quatspinw.setValue(conf[3])
+                self.quatspinx.setValue(conf[4])
+                self.quatspiny.setValue(conf[5])
+                self.quatspinz.setValue(conf[6])
+        #self.showConfig()
 
     def setChooseWithMouse (self):
         self.plugin.chooseWithMouse = True
@@ -360,7 +403,9 @@ class _RbprmPath (QtGui.QWidget):
 
     def affordanceAnalysis (self):
         objectname = str(self.affAnalysisObjects.currentText)
+        self.lastObject = objectname
         affType = str(self.affAnalysisOptions.currentText)
+        self.lastAff = affType
         if objectname == "All objects":
             objectname = ""
             self.plugin.affClient.affordance.analyseAll ()
@@ -372,6 +417,7 @@ class _RbprmPath (QtGui.QWidget):
                  self.visualiseAffordances(aff, self.colour, objectname)
         else:
             self.visualiseAffordances(affType, self.colour, objectname)
+        self.analysed = True
         self.update ()
 
     def getAffordancePoints (self, affordanceType):
@@ -473,8 +519,10 @@ class _RbprmPath (QtGui.QWidget):
                count += 1
 
     def deleteAffordancesByType (self):
-        objectname = str(self.deleteObjects.currentText)
-        affType = str(self.deleteAffs.currentText)
+        objectname = str(self.affAnalysisObjects.currentText)
+        self.lastObject = objectname
+        affType = str(self.affAnalysisOptions.currentText)
+        self.lastAff = affType
         if objectname == "All objects":
             objectname = ""
         if affType == "All types":
@@ -640,6 +688,7 @@ class _BoundsDialog(QtGui.QDialog):
                 item.addChild(child)
                 self.boundsTree.addTopLevelItem(item)
                 self.boundsTree.expandItem(item)
+        self.jointList.setCurrentItem(self.jointList.item(0))
         if (self.plugin.SO3bounds[0] < self.plugin.SO3bounds[1]):
             item = QtGui.QTreeWidgetItem()
             item.setText(0,'So3bounds')
@@ -1059,9 +1108,17 @@ class _AffCreator (QtGui.QWidget):
         self.slider.setMaximum(10)
         self.slider.setValue(1)
         self.slider.setTickInterval(1)
-        vbox1.addWidget(self.slider)
-
         
+        self.play = QtGui.QPushButton()
+        self.play.setIcon(self.style().standardIcon(QtGui.QStyle.SP_MediaPlay))
+        self.stop = QtGui.QPushButton()
+        self.stop.setIcon(self.style().standardIcon(QtGui.QStyle.SP_MediaStop))
+        self.pause = QtGui.QPushButton()
+        self.pause.setIcon(self.style().standardIcon(QtGui.QStyle.SP_MediaPause))
+        vbox1.addWidget(self.addWidgetsInHBox([self.play, self.stop, self.pause, self.slider]))
+        self.play.setDisabled(True)
+
+        self.play.pressed.connect(self.play) 
         self.slider.valueChanged.connect(self.draw)
         
         vbox1 = QtGui.QVBoxLayout(self)
@@ -1115,6 +1172,7 @@ class _AffCreator (QtGui.QWidget):
             self.plugin.fullbody.loadFullBodyModel (urdfName, rootJointType,\
                     meshPackageName, packageName, urdfSuffix, srdfSuffix)
             self.addToViewer()
+            self.plugin.client.gui.setVisibility(self.plugin.builder.name, "OFF")
         self.update()
 
     def Limb (self):
@@ -1136,6 +1194,7 @@ class _AffCreator (QtGui.QWidget):
                 resolution = float(tab.res.value)
                 self.plugin.fullbody.addLimb(legId,leg,foot,offset,normal, legxlegy[0],\
                         legxlegy[1], nbSamples, heuristic, resolution, cType)
+                self.r(self.plugin.fullbody.getCurrentConfig())
         self.update()
 
     def computeContacts (self):
@@ -1155,7 +1214,16 @@ class _AffCreator (QtGui.QWidget):
         self.configs = self.plugin.fullbody.interpolate(0.1, 1, 0)
         self.computeStatus.setText("Done")
         self.computeStatus.setStyleSheet("background-color: green")
+        self.play.setDisabled(False)
         self.update()
+
+    def play (self):
+        if len (self.configs) > 0:
+            for i in range(0,len(self.configs)):
+                self.draw(i)
+                i=i+1
+                time.sleep (0.5)
+                self.slider.setValue(i)
 
     def addToViewer (self):
         self.ps = ProblemSolver(self.plugin.fullbody)
@@ -1208,9 +1276,9 @@ class Plugin(QtGui.QDockWidget):
     """
     def __init__ (self, mainWindow, flags = None):
         if flags is None:
-            super(Plugin, self).__init__ ("Affordance plugin", mainWindow)
+            super(Plugin, self).__init__ ("Rbprm plugin", mainWindow)
         else:
-            super(Plugin, self).__init__ ("Affordance plugin", mainWindow, flags)
+            super(Plugin, self).__init__ ("Rbprm plugin", mainWindow, flags)
         self.client = Client ()
         self.rbprmClient = rbprmClient ()
         self.builder = Builder ()
@@ -1225,15 +1293,12 @@ class Plugin(QtGui.QDockWidget):
         self.tabWidget = QtGui.QTabWidget() #(self)
         self.setWidget (self.tabWidget)
         self.rbprmPath = _RbprmPath (self,self)
-        self.tabWidget.addTab (self.rbprmPath, "Rbprm Path")
+        self.tabWidget.addTab (self.rbprmPath, "Tab 1")
         self.affCreator = _AffCreator(self, self)
-        self.tabWidget.addTab (self.affCreator, "Rbprm Interp")
-  #      self.rbprmInterp = _RbprmInterp (self,self)
-  #      self.tabWidget.addTab (self.rbprmInterp, "Rbprm Interp")
+        self.tabWidget.addTab (self.affCreator, "Tab 2")
         self.main = mainWindow
         mainSize = self.main.size
         self.tabWidget.setMaximumSize(int(float(mainSize.width())*0.6), mainSize.height())
-        #self.tabWidget.sizeHint(int(float(mainSize.width())*0.6), mainSize.height())
         mainWindow.connect('refresh()', self.refresh)
         self.chooseWithMouse = False
         self.tabWidget.connect(self.tabWidget, QtCore.SIGNAL("currentChanged(int)"), self.updateSelected)
@@ -1259,6 +1324,6 @@ class Plugin(QtGui.QDockWidget):
 
     def selected(self, name, posInWorldFrame):
         if (self.chooseWithMouse):
-            QtGui.QMessageBox.information(self, "Selected object", name + " " + str(posInWorldFrame))
-            self.rbprmPath.setConfigPos(self.rbprmPath.qvector2float (posInWorldFrame), -1)
+         #   QtGui.QMessageBox.information(self, "Selected object", name + " " + str(posInWorldFrame))
+            self.rbprmPath.spinConfig(self.rbprmPath.qvector2float (posInWorldFrame))
 
