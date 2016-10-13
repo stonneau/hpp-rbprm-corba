@@ -9,6 +9,7 @@ from hpp.corbaserver.rbprm.problem_solver import ProblemSolver
 from hpp.gepetto import Viewer
 import math
 import time
+from threading import Thread
 
 def magnitude(v):
     return math.sqrt(sum(v[i]*v[i] for i in range(len(v))))
@@ -79,7 +80,7 @@ class _RbprmPath (QtGui.QWidget):
 
         #---------------------------joint bounds and config:
         vbox.addWidget(self.addWidgetsInHBox([self.bindFunctionToButton("Set joint bounds",\
-                self.JointBounds), self.bindFunctionToButton("Panic!",self.addToViewer)]))
+                self.JointBounds), ]))
 
         self.showTick = QtGui.QCheckBox("Show configuration")
         self.clickTick = QtGui.QCheckBox("Choose with mouse")
@@ -247,7 +248,9 @@ class _RbprmPath (QtGui.QWidget):
             srdfSuffix = str(self.robotdialog.srdfSuf.text)
             self.plugin.builder.loadModel(urdfName, urdfNameRom, rootJointType, \
                     meshPackageName, packageName, urdfSuffix, srdfSuffix)
-            self.plugin.main.createView("window_hpp_") #TODO: find way of adding view of custom name
+            if (self.plugin.viewCreated == False):
+                self.plugin.main.createView("window_hpp_") #TODO: find way of adding view of custom name
+                self.plugin.viewCreated = True
             self.addToViewer()
         self.update()
 
@@ -264,19 +267,22 @@ class _RbprmPath (QtGui.QWidget):
             print ("Please load ROM robot before environment.")
 
     def JointBounds (self):
-        self.boundsdialog = _BoundsDialog(self.plugin)
-        if self.boundsdialog.exec_():
-            name = str(self.boundsdialog.jointList.currentItem().text())
-            bounds = [self.boundsdialog.minx.value, self.boundsdialog.maxx.value,\
-                    self.boundsdialog.miny.value, self.boundsdialog.maxy.value,\
-                    self.boundsdialog.minz.value, self.boundsdialog.maxz.value]
-            self.plugin.builder.setJointBounds (name, bounds)
-            if self.boundsdialog.tick.isChecked():
-                quatbounds = [self.boundsdialog.quatminx.value, self.boundsdialog.quatmaxx.value,\
-                    self.boundsdialog.quatminy.value, self.boundsdialog.quatmaxy.value,\
-                    self.boundsdialog.quatminz.value, self.boundsdialog.quatmaxz.value]
-                self.plugin.builder.boundSO3(quatbounds)
-                self.plugin.SO3bounds = quatbounds
+        if hasattr(self.plugin.builder, 'name'):
+            self.boundsdialog = _BoundsDialog(self.plugin)
+            if self.boundsdialog.exec_():
+                name = str(self.boundsdialog.jointList.currentItem().text())
+                bounds = [self.boundsdialog.minx.value, self.boundsdialog.maxx.value,\
+                        self.boundsdialog.miny.value, self.boundsdialog.maxy.value,\
+                        self.boundsdialog.minz.value, self.boundsdialog.maxz.value]
+                self.plugin.builder.setJointBounds (name, bounds)
+                if self.boundsdialog.tick.isChecked():
+                    quatbounds = [self.boundsdialog.quatminx.value, self.boundsdialog.quatmaxx.value,\
+                        self.boundsdialog.quatminy.value, self.boundsdialog.quatmaxy.value,\
+                        self.boundsdialog.quatminz.value, self.boundsdialog.quatmaxz.value]
+                    self.plugin.builder.boundSO3(quatbounds)
+                    self.plugin.SO3bounds = quatbounds
+        else:
+            print ("Please add ROM robot before setting bounds")
 
     def Affordance (self):
         self.affdialog = _AffDialog(self.plugin)
@@ -292,21 +298,22 @@ class _RbprmPath (QtGui.QWidget):
         self.update()
 
     def addFilters (self):
-        items = self.ROMaffList.selectedItems()
-        affItems = self.affTypeList.selectedItems()
-        if (len(items) > 0):
-            ROMnames = self.plugin.rbprmClient.rbprm.getFilter()
+        if hasattr(self.plugin.builder, 'name'):
+            items = self.ROMaffList.selectedItems()
+            affItems = self.affTypeList.selectedItems()
+            if (len(items) > 0):
+                ROMnames = self.plugin.rbprmClient.rbprm.getFilter()
+                for item in items:
+                    rom = str(item.text())
+                    if rom not in ROMnames:
+                        ROMnames.append(rom)
+                self.plugin.rbprmClient.rbprm.setFilter(ROMnames)
+            affNames = []
+            for aff in affItems:
+                affNames.append(str(aff.text()))
             for item in items:
-                rom = str(item.text())
-                if rom not in ROMnames:
-                    ROMnames.append(rom)
-            self.plugin.rbprmClient.rbprm.setFilter(ROMnames)
-        affNames = []
-        for aff in affItems:
-            affNames.append(str(aff.text()))
-        for item in items:
-            self.plugin.rbprmClient.rbprm.setAffordanceFilter(str(item.text()), affNames)
-        self.update()
+                self.plugin.rbprmClient.rbprm.setAffordanceFilter(str(item.text()), affNames)
+            self.update()
 
     def addToViewer (self):
         self.ps = ProblemSolver(self.plugin.builder)
@@ -1049,13 +1056,14 @@ class _AffDialog(QtGui.QDialog):
 #------------------------------------------------------------------end _Dialogs
 
 #------------------------------------------------------------------start _AffCreator
-class _AffCreator (QtGui.QWidget):
+class _RbprmInterp (QtGui.QWidget):
     def __init__(self, parent, plugin):
-        super(_AffCreator, self).__init__ (parent)
+        super(_RbprmInterp, self).__init__ (parent)
         self.plugin = plugin
-        self.initConfigSet = False
         self.plugin.SO3bounds = [1,0,1,0,1,0]
         self.configs = []
+        self.tolerance = -1
+       # self.exampleThread = QtCore.QThread()
         vbox1 = QtGui.QVBoxLayout(self)
         gridW = QtGui.QWidget()#(self)
         grid = QtGui.QGridLayout(gridW)
@@ -1064,10 +1072,11 @@ class _AffCreator (QtGui.QWidget):
         self.grid2 = QtGui.QGridLayout(self.groupbox)
         optimiserLabel = QtGui.QLabel("Choose Path Optimisers:")
         self.optimiserList = QtGui.QListWidget()
-        self.chosenOptimiserList = QtGui.QListWidget()
-        shooterLabel = QtGui.QLabel("Choose Configuration Shooter:")
+        self.optimiserList.setSelectionMode(QtGui.QAbstractItemView.ExtendedSelection)
+        self.chosenTree = QtGui.QTreeWidget()
+        shooterLabel = QtGui.QLabel("Configuration Shooter:")
         self.shooters = QtGui.QComboBox()
-        validationLabel = QtGui.QLabel("Choose Path Validation method:")
+        validationLabel = QtGui.QLabel("Path Validation method:")
         self.validations = QtGui.QComboBox()
         toleranceLabel = QtGui.QLabel("Validation tolerance:")
         self.validationTolerance = QtGui.QDoubleSpinBox()
@@ -1077,7 +1086,7 @@ class _AffCreator (QtGui.QWidget):
         self.clearOptimisers = self.bindFunctionToButton("Clear path optimisers", self.clearOptimisers)
         self.grid2.addWidget(optimiserLabel, 0,0)
         self.grid2.addWidget(self.optimiserList, 1,0)
-        self.grid2.addWidget(self.chosenOptimiserList, 1,1)
+        self.grid2.addWidget(self.chosenTree, 1,1)
         self.grid2.addWidget(shooterLabel, 2,0)
         self.grid2.addWidget(self.shooters, 2,1)
         self.grid2.addWidget(validationLabel, 3,0)
@@ -1105,7 +1114,7 @@ class _AffCreator (QtGui.QWidget):
                 self.computeContacts), self.computeStatus]))
         self.slider = QtGui.QSlider(QtCore.Qt.Horizontal)
         self.slider.setMinimum(1)
-        self.slider.setMaximum(10)
+        self.slider.setMaximum(100)
         self.slider.setValue(1)
         self.slider.setTickInterval(1)
         
@@ -1118,7 +1127,7 @@ class _AffCreator (QtGui.QWidget):
         vbox1.addWidget(self.addWidgetsInHBox([self.play, self.stop, self.pause, self.slider]))
         self.play.setDisabled(True)
 
-        self.play.pressed.connect(self.play) 
+        self.play.clicked.connect(self.playConfigs) 
         self.slider.valueChanged.connect(self.draw)
         
         vbox1 = QtGui.QVBoxLayout(self)
@@ -1129,7 +1138,6 @@ class _AffCreator (QtGui.QWidget):
         vals = self.plugin.basicClient.problem.getAvailable("PathValidation")
         shs = self.plugin.basicClient.problem.getAvailable("ConfigurationShooter")
         self.optimiserList.clear()
-        self.chosenOptimiserList.clear()
         self.validations.clear()
         self.shooters.clear()
         item = []
@@ -1143,7 +1151,38 @@ class _AffCreator (QtGui.QWidget):
         for sh in shs:
             self.shooters.addItem(sh)
         self.shooters.setCurrentIndex(shs.index(sh))
-
+        opts = self.plugin.basicClient.problem.getSelected("PathOptimizer")
+        vals = self.plugin.basicClient.problem.getSelected("PathValidation")
+        shs = self.plugin.basicClient.problem.getSelected("ConfigurationShooter")
+        self.chosenTree.clear()
+        item = QtGui.QTreeWidgetItem()
+        item.setText(0,"Path optimisers")
+        for opt in opts:
+            child = QtGui.QTreeWidgetItem()
+            child.setText(0,opt)
+            item.addChild(child)
+        self.chosenTree.addTopLevelItem(item)
+        self.chosenTree.expandItem(item)
+        item = QtGui.QTreeWidgetItem()
+        item.setText(0,"Configuration shooter")
+        for sh in shs:
+            child = QtGui.QTreeWidgetItem()
+            child.setText(0,sh)
+            item.addChild(child)
+        self.chosenTree.addTopLevelItem(item)
+        self.chosenTree.expandItem(item)
+        item = QtGui.QTreeWidgetItem()
+        item.setText(0,"Path validation")
+        for val in vals:
+            child = QtGui.QTreeWidgetItem()
+            child.setText(0,val)
+            item.addChild(child)
+            if self.tolerance > 0:
+                child = QtGui.QTreeWidgetItem()
+                child.setText(0,str(self.tolerance))
+                item.addChild(child)
+        self.chosenTree.addTopLevelItem(item)
+        self.chosenTree.expandItem(item)
         self.slider.setMaximum(len(self.configs)-1)
         
     def addWidgetsInHBox(self, widgets):
@@ -1160,6 +1199,7 @@ class _AffCreator (QtGui.QWidget):
         return button
 
     def Fullbody (self):
+        self.resetStatus()
         self.fbdialog = _FullBodyDialog()
         if self.fbdialog.exec_():
             name = str(self.fbdialog.Envname.text)
@@ -1198,32 +1238,50 @@ class _AffCreator (QtGui.QWidget):
         self.update()
 
     def computeContacts (self):
-        self.computeStatus.setText("Computing")
-        self.computeStatus.setStyleSheet("background-color: yellow")
-        q_init = self.plugin.fullbody.getCurrentConfig()
-        q_init[0:7] = self.plugin.rbprmPath.q_init[0:7]
-        q_goal = self.plugin.fullbody.getCurrentConfig();
-        q_goal[0:7] = self.plugin.rbprmPath.q_goal[0:7]
-        self.plugin.fullbody.setCurrentConfig (q_init)
-        self.q_init = self.plugin.fullbody.generateContacts(q_init, [0,0,1])
-        self.plugin.fullbody.setCurrentConfig (q_goal)
-        self.q_goal = self.plugin.fullbody.generateContacts(q_goal, [0,0,1])
-        self.plugin.fullbody.setStartState(q_init,[])
-        self.plugin.fullbody.setEndState(q_goal,self.legIds)
-        self.r(q_init)
-        self.configs = self.plugin.fullbody.interpolate(0.1, 1, 0)
-        self.computeStatus.setText("Done")
-        self.computeStatus.setStyleSheet("background-color: green")
-        self.play.setDisabled(False)
-        self.update()
+        self.resetStatus()
+        if self.plugin.rbprmPath.initConfigSet == False:
+            print ("Please set initial configuration and solve before computing contacts.")
+        else:
+            goals = self.plugin.basicClient.problem.getGoalConfigs()
+            if (len (goals)) < 1:
+                print ("Please add goal configurationand solve before computing contacts.")
+            else:
+                #TODO check that init & goal not the same as this leads to segmentation fault
+                self.computeStatus.setText("Computing")
+                self.computeStatus.setStyleSheet("background-color: yellow")
+                t = Thread(target=self.contacts, args=(self,\
+                        self.plugin.rbprmPath.q_init, self.plugin.rbprmPath.q_goal))
+                t.start()
+                while t.is_alive():
+                    QtCore.QCoreApplication.processEvents()
+                    time.sleep(0.2)
+                self.r(self.q_init)
+                self.computeStatus.setText("Done")
+                self.computeStatus.setStyleSheet("background-color: green")
+                self.play.setDisabled(False)
+                self.update()
 
-    def play (self):
+    def contacts (self, tab, q_i, q_g):
+        q_init = tab.plugin.fullbody.getCurrentConfig()
+        q_init[0:7] = q_i[0:7]
+        q_goal = tab.plugin.fullbody.getCurrentConfig();
+        q_goal[0:7] = q_g[0:7]
+        tab.plugin.fullbody.setCurrentConfig (q_init)
+        tab.q_init = tab.plugin.fullbody.generateContacts(q_init, [0,0,1])
+        tab.plugin.fullbody.setCurrentConfig (q_goal)
+        tab.q_goal = tab.plugin.fullbody.generateContacts(q_goal, [0,0,1])
+        tab.plugin.fullbody.setStartState(q_init,[])
+        tab.plugin.fullbody.setEndState(q_goal,tab.legIds)        
+        tab.configs = self.plugin.fullbody.interpolate(0.1, 1, 0)
+
+    def playConfigs (self):
+        self.resetStatus()
         if len (self.configs) > 0:
             for i in range(0,len(self.configs)):
-                self.draw(i)
-                i=i+1
-                time.sleep (0.5)
+                QtCore.QCoreApplication.processEvents()
                 self.slider.setValue(i)
+                time.sleep (0.2)
+                
 
     def addToViewer (self):
         self.ps = ProblemSolver(self.plugin.fullbody)
@@ -1251,24 +1309,51 @@ class _AffCreator (QtGui.QWidget):
             self.r (q)
         self.update()
 
+    def resetStatus (self):
+        self.solveStatus.setText("")
+        self.solveStatus.setStyleSheet("background-color: blue")
+        self.computeStatus.setText("")
+        self.computeStatus.setStyleSheet("background-color: blue")
+
     def validateSettings (self):
         self.plugin.basicClient.problem.addPathOptimizer (str(self.optimiserList.currentItem().text()))
         self.plugin.basicClient.problem.selectConFigurationShooter (str(self.shooters.currentText))
         self.plugin.basicClient.problem.selectPathValidation (str(self.validations.currentText),\
                 float(self.validationTolerance.value))
+        self.tolerance = float(self.validationTolerance.value)
+        self.update()
 
     def clearOptimisers (self):
         self.plugin.basicClient.problem.clearPathOptimizers()
         self.update()
 
     def solve (self):
-        self.solveStatus.setText("Solving")
-        self.solveStatus.setStyleSheet("background-color: yellow")
-        self.plugin.basicClient.problem.solve()
-        self.solveStatus.setText("Done")
-        self.solveStatus.setStyleSheet("background-color: green")
-        self.update()
-#------------------------------------------------------------------end _AffCreator
+        self.resetStatus()
+        if self.plugin.rbprmPath.initConfigSet == False:
+            print ("Please set initial configuration before solving.")
+        else:
+            goals = self.plugin.basicClient.problem.getGoalConfigs()
+            if (len (goals)) < 1:
+                print ("Please add goal configuration before solving.")
+            else:
+                self.solveStatus.setText("Solving")
+                self.solveStatus.setStyleSheet("background-color: yellow")
+                t = Thread(target=self.solver, args=(self,))
+                t.start()
+                while t.is_alive():
+                    QtCore.QCoreApplication.processEvents()
+                    time.sleep(0.2)
+                #self.plugin.basicClient.problem.solve()
+                self.solveStatus.setText("Done")
+                self.solveStatus.setStyleSheet("background-color: green")
+                self.update()
+
+    def solver (self, tab):
+        tab.plugin.basicClient.problem.solve()
+
+
+#------------------------------------------------------------------end _RbprmInterp
+#------------------------------------------------------------------start plugin:
 
 class Plugin(QtGui.QDockWidget):
     """
@@ -1279,6 +1364,7 @@ class Plugin(QtGui.QDockWidget):
             super(Plugin, self).__init__ ("Rbprm plugin", mainWindow)
         else:
             super(Plugin, self).__init__ ("Rbprm plugin", mainWindow, flags)
+        self.viewCreated = False
         self.client = Client ()
         self.rbprmClient = rbprmClient ()
         self.builder = Builder ()
@@ -1294,8 +1380,8 @@ class Plugin(QtGui.QDockWidget):
         self.setWidget (self.tabWidget)
         self.rbprmPath = _RbprmPath (self,self)
         self.tabWidget.addTab (self.rbprmPath, "Tab 1")
-        self.affCreator = _AffCreator(self, self)
-        self.tabWidget.addTab (self.affCreator, "Tab 2")
+        self.rbprmInterp = _RbprmInterp(self, self)
+        self.tabWidget.addTab (self.rbprmInterp, "Tab 2")
         self.main = mainWindow
         mainSize = self.main.size
         self.tabWidget.setMaximumSize(int(float(mainSize.width())*0.6), mainSize.height())
@@ -1315,11 +1401,12 @@ class Plugin(QtGui.QDockWidget):
     def updateSelected(self):
         currentWidget=self.tabWidget.currentWidget()
         currentWidget.update()
+        self.rbprmInterp.resetStatus()
 
     def refresh(self):
         mainSize = self.main.size
         self.tabWidget.setMaximumSize(int(float(mainSize.width())*0.6), mainSize.height())
-        self.affCreator.update()
+        self.rbprmInterp.update()
         self.rbprmPath.update()
 
     def selected(self, name, posInWorldFrame):
