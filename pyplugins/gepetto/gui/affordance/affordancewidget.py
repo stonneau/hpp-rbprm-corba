@@ -1103,8 +1103,6 @@ class _RbprmInterp (QtGui.QWidget):
         vbox1.addWidget(self.addWidgetsInHBox([self.bindFunctionToButton("Solve", self.solve),\
                 self.solveStatus]))
 
-    #    robotLabel = QtGui.QLabel("Set up rbprm models:")
-    #    vbox.addWidget(robotLabel)
         self.computeStatus = QtGui.QLabel()
         self.computeStatus.setAlignment(QtCore.Qt.AlignCenter)
         self.computeStatus.setStyleSheet("background-color: blue")
@@ -1202,40 +1200,59 @@ class _RbprmInterp (QtGui.QWidget):
         self.resetStatus()
         self.fbdialog = _FullBodyDialog()
         if self.fbdialog.exec_():
-            name = str(self.fbdialog.Envname.text)
-            packageName = str(self.fbdialog.pkgName.text)
-            urdfName =  str(self.fbdialog.urdfName.text)
-            meshPackageName = str(self.fbdialog.mpkgName.text)
-            rootJointType = str(self.fbdialog.rootJoint.currentText)
-            urdfSuffix = str(self.fbdialog.urdfSuf.text)
-            srdfSuffix = str(self.fbdialog.srdfSuf.text)
-            self.plugin.fullbody.loadFullBodyModel (urdfName, rootJointType,\
-                    meshPackageName, packageName, urdfSuffix, srdfSuffix)
+            info = []
+            info.append (str(self.fbdialog.Envname.text))
+            info.append (str(self.fbdialog.urdfName.text))
+            info.append (str(self.fbdialog.rootJoint.currentText))
+            info.append (str(self.fbdialog.mpkgName.text))
+            info.append (str(self.fbdialog.pkgName.text))
+            info.append (str(self.fbdialog.urdfSuf.text))
+            info.append (str(self.fbdialog.srdfSuf.text))
+            t = Thread(target=self.loadFullbody, args=(self, info))
+            t.start()
+            while t.is_alive():
+                QtCore.QCoreApplication.processEvents()
+                time.sleep(0.2)
             self.addToViewer()
             self.plugin.client.gui.setVisibility(self.plugin.builder.name, "OFF")
-        self.update()
+            self.update()
+
+    def loadFullbody (self, tab, info):
+        tab.plugin.fullbody.loadFullBodyModel (info[1],info[2],info[3],\
+                info[4], info[5],info[6])
 
     def Limb (self):
         self.limbdialog = _LimbDialog()
         if self.limbdialog.exec_():
             tabs = self.limbdialog.tabs
+            infos = []
             self.legIds = []
             for tab in tabs:
-                legId = str(tab.legId.text)
-                self.legIds.append(legId)
-                cType = str(tab.cType.currentText)
-                leg = str(tab.leg.text)
-                foot = str(tab.foot.text)
-                offset = self.str2float(str(tab.offset.text))
-                normal = self.str2float(str(tab.normal.text))
-                legxlegy = self.str2float(str(tab.legxlegy.text))
-                nbSamples = int(tab.nbSamples.value)
-                heuristic = str(tab.heur.currentText)
-                resolution = float(tab.res.value)
-                self.plugin.fullbody.addLimb(legId,leg,foot,offset,normal, legxlegy[0],\
-                        legxlegy[1], nbSamples, heuristic, resolution, cType)
-                self.r(self.plugin.fullbody.getCurrentConfig())
-        self.update()
+                info = []
+                info.append (str(tab.legId.text))
+                self.legIds.append(info[0])     
+                info.append (str(tab.leg.text))
+                info.append (str(tab.foot.text))
+                info.append (self.str2float(str(tab.offset.text)))
+                info.append (self.str2float(str(tab.normal.text)))
+                info.append (self.str2float(str(tab.legxlegy.text)))
+                info.append (int(tab.nbSamples.value))
+                info.append (str(tab.heur.currentText))
+                info.append (float(tab.res.value))
+                info.append (str(tab.cType.currentText))
+                infos.append(info)
+            t = Thread(target=self.loadLimbs, args=(self, infos))
+            t.start()
+            while t.is_alive():
+                QtCore.QCoreApplication.processEvents()
+                time.sleep(0.2)
+            self.r(self.plugin.fullbody.getCurrentConfig())
+            self.update()
+
+    def loadLimbs(self, tab, infos):
+        for info in infos:
+            tab.plugin.fullbody.addLimb(info[0],info[1],info[2],info[3],info[4], info[5][0],\
+                    info[5][1], info[6], info[7], info[8], info[9])
 
     def computeContacts (self):
         self.resetStatus()
@@ -1371,6 +1388,9 @@ class Plugin(QtGui.QDockWidget):
         self.fullbody = FullBody ()
         self.basicClient  = basicClient ()
         self.affClient = affClient ()
+        self.cursor = QtGui.QCursor ()
+        #self.cursor.setShape (QtCore.Qt.OpenHandCursor)
+        #self.cursor.setShape (QtCore.Qt.ClosedHandCursor)
         #action.setShortcut(QtGui.QKeySequence("Shift+Alt+A"))
         #self.mainWindow.actionExit.setShortcut('Ctrl+Alt+A')
         #self.mainWindow.actionExit.setStatusTip(_('Open affordance plugin'))
@@ -1391,6 +1411,10 @@ class Plugin(QtGui.QDockWidget):
     ### If present, this function is called when a new OSG Widget is created.
     def osgWidget(self, osgWindow):
         osgWindow.connect('selected(QString,QVector3D)', self.selected)
+        #osgWindow.setMouseTracking(True)
+        #osgWindow.connect('mouseMoveEvent(QtCore.QEvent.MouseMove)',self.mouseMove)
+        
+        #osgWindow.cursor.pos()connect('')
 
     def resetConnection(self):
         self.client = Client()
@@ -1408,6 +1432,9 @@ class Plugin(QtGui.QDockWidget):
         self.tabWidget.setMaximumSize(int(float(mainSize.width())*0.6), mainSize.height())
         self.rbprmInterp.update()
         self.rbprmPath.update()
+
+    def mouseMove (self):
+        print ("moved mouse")
 
     def selected(self, name, posInWorldFrame):
         if (self.chooseWithMouse):
