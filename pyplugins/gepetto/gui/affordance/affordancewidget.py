@@ -1491,12 +1491,11 @@ class Plugin(QtGui.QDockWidget):
         self.cursor = QtGui.QCursor ()
         #self.cursor.setShape (QtCore.Qt.OpenHandCursor)
         #self.cursor.setShape (QtCore.Qt.ClosedHandCursor)
-        #action.setShortcut(QtGui.QKeySequence("Shift+Alt+A"))
-        #self.mainWindow.actionExit.setShortcut('Ctrl+Alt+A')
-        #self.mainWindow.actionExit.setStatusTip(_('Open affordance plugin'))
-        #self.mainWindow.connect(self.mainWindow.actionExit, QtCore.SIGNAL('triggered()'), QtCore.SLOT('close()'))
-        # Initialize the widget
-        self.tabWidget = QtGui.QTabWidget() #(self)
+        # add shortcut:
+        action = self.toggleViewAction()
+        action.setShortcut(QtGui.QKeySequence("Ctrl+Alt+A"))
+        #initialise tab widget
+        self.tabWidget = QtGui.QTabWidget()
         self.setWidget (self.tabWidget)
         self.rbprmPath = _RbprmPath (self,self)
         self.tabWidget.addTab (self.rbprmPath, "Tab 1")
@@ -1508,6 +1507,14 @@ class Plugin(QtGui.QDockWidget):
         mainWindow.connect('refresh()', self.refresh)
         self.chooseWithMouse = False
         self.tabWidget.connect(self.tabWidget, QtCore.SIGNAL("currentChanged(int)"), self.updateSelected)
+        self.tryEnv()
+
+    def tryEnv(self):
+        import os
+        path = os.environ.get('CMAKE_PREFIX_PATH')
+        paths = path.split(':')
+        print ("settings :", paths)
+
     ### If present, this function is called when a new OSG Widget is created.
     def osgWidget(self, osgWindow):
         osgWindow.connect('selected(QString,QVector3D)', self.selected)
