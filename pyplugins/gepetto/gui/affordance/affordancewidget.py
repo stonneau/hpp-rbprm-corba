@@ -20,6 +20,26 @@ def normalise(v):
         vmag = 1.0
     return [ v[i]/vmag  for i in range(len(v)) ]
 
+def checkBounds (bounds):
+    if (len(bounds)%2 != 0):
+        print ("Bounds vector has wrong length!")
+    else:
+        for i in range(len(bounds)/2):
+            if bounds[i*2] > bounds[i*2+1]:
+                return False
+        return True
+
+def equal (v1, v2):
+    res = True
+    if len(v1) == len(v2):
+        for i in range (len(v1)):
+            if v1[i] != v2[i]:
+                res = False
+                break
+    else:
+        res = False
+    return res
+
 ### This class represents one special tab of the new QDockWidget
 class _RbprmPath (QtGui.QWidget):
     def __init__(self, parent, plugin):
@@ -78,89 +98,52 @@ class _RbprmPath (QtGui.QWidget):
         self.affGrid.addWidget(self.bindFunctionToButton("Delete", self.deleteAffordancesByType), 2,2)
         vbox.addWidget (self.affGroup) 
 
-        #---------------------------joint bounds and config:
-        vbox.addWidget(self.addWidgetsInHBox([self.bindFunctionToButton("Set joint bounds",\
-                self.JointBounds), ]))
-
+        #---------------------------joint bounds and config:     
         self.showTick = QtGui.QCheckBox("Show configuration")
         self.clickTick = QtGui.QCheckBox("Choose with mouse")
         self.configCombo = QtGui.QComboBox()
         self.configCombo.addItem("initial")
         self.configCombo.addItem("goal")
-        initLabel = QtGui.QLabel("initial:")
-        goalLabel = QtGui.QLabel("goal:")
+        self.jointCombo = QtGui.QComboBox()
         self.initq = QtGui.QLineEdit("-2, 0, 0.63, 1, 0, 0, 0")
         self.goalq = QtGui.QLineEdit("3, 0, 0.63, 1, 0, 0, 0")
-        vbox.addWidget(self.addWidgetsInHBox([self.clickTick, self.configCombo,\
+        vbox.addWidget(self.addWidgetsInHBox([self.bindFunctionToButton("Set joint bounds",\
+                self.JointBounds),self.clickTick,]))
+        vbox.addWidget(self.addWidgetsInHBox([self.jointCombo, self.configCombo,\
                 self.bindFunctionToButton("Add",self.addConfig),\
                 self.bindFunctionToButton("Clear",self.clearConfigs)]))
-     #   vbox.addWidget(self.addWidgetsInHBox([initLabel, self.initq, goalLabel, self.goalq]))
         self.configTree = QtGui.QTreeWidget()
 
         self.groupbox = QtGui.QGroupBox()
         self.grid2 = QtGui.QGridLayout(self.groupbox)
         self.grid2.setSpacing(10)
-        self.spinx = QtGui.QDoubleSpinBox ()
-        self.spiny = QtGui.QDoubleSpinBox ()
-        self.spinz = QtGui.QDoubleSpinBox ()
-        self.spinx.setRange(-10,10)
-        self.spiny.setRange(-10,10)
-        self.spinz.setRange(-10,10)
-        self.spinx.setValue(-2)
-        self.spinz.setValue(0.63)
-        label1 = QtGui.QLabel("x")
-        label2 = QtGui.QLabel("y")
-        label3 = QtGui.QLabel("z")
-        self.spinx.setSingleStep (0.01)
-        self.spiny.setSingleStep (0.01)
-        self.spinz.setSingleStep (0.01)
-        
-        self.quatspinw = QtGui.QDoubleSpinBox ()
-        self.quatspinx = QtGui.QDoubleSpinBox ()
-        self.quatspiny = QtGui.QDoubleSpinBox ()
-        self.quatspinz = QtGui.QDoubleSpinBox ()
-        self.quatspinw.setRange(-10,10)
-        self.quatspinx.setRange(-10,10)
-        self.quatspiny.setRange(-10,10)
-        self.quatspinz.setRange(-10,10)
-        label4 = QtGui.QLabel("w")
-        label5 = QtGui.QLabel("x")
-        label6 = QtGui.QLabel("y")
-        label7 = QtGui.QLabel("z")
-        self.quatspinw.setSingleStep (0.01)
-        self.quatspinx.setSingleStep (0.01)
-        self.quatspiny.setSingleStep (0.01)
-        self.quatspinz.setSingleStep (0.01)
-        self.quatspinw.setValue(1)
-        self.grid2.addWidget (label1,0,0)
-        self.grid2.addWidget (self.spinx,0,1)
-        self.grid2.addWidget (label2,1,0)
-        self.grid2.addWidget (self.spiny,1,1)
-        self.grid2.addWidget (label3,2,0)
-        self.grid2.addWidget (self.spinz,2,1)
-        label8 = QtGui.QLabel("Config validation:")
+        self.jointConfig = []
+        self.labels = []
+        for i in range(0,4):
+            self.jointConfig.append(QtGui.QDoubleSpinBox())
+            self.jointConfig[i].setRange(-1000,1000)
+            self.jointConfig[i].setSingleStep (0.01)
+            self.labels.append(QtGui.QLabel(str(i)+ ":"))
+
+        self.grid2.addWidget (self.labels[0],0,0)
+        self.grid2.addWidget (self.jointConfig[0],0,1)
+        self.grid2.addWidget (self.labels[1],1,0)
+        self.grid2.addWidget (self.jointConfig[1],1,1)
+        self.grid2.addWidget (self.labels[2],2,0)
+        self.grid2.addWidget (self.jointConfig[2],2,1)
+        self.grid2.addWidget (self.labels[3],3,0)
+        self.grid2.addWidget (self.jointConfig[3],3,1)
         self.validator = QtGui.QGroupBox()
         self.validator.setStyleSheet("background-color: blue")
-        #self.grid2.addWidget (label8,0,2)
-        self.grid2.addWidget (self.validator,3,1,1,1)
-        self.grid2.addWidget (label4,0,3)
-        self.grid2.addWidget (self.quatspinw,0,4)
-        self.grid2.addWidget (label5,1,3)
-        self.grid2.addWidget (self.quatspinx,1,4)
-        self.grid2.addWidget (label6,2,3)
-        self.grid2.addWidget (self.quatspiny,2,4)
-        self.grid2.addWidget (label7,3,3)
-        self.grid2.addWidget (self.quatspinz,3,4)
+        self.grid2.addWidget (self.validator,0,2,4,1)
         vbox.addWidget(self.addWidgetsInHBox([self.configTree, self.groupbox]))
 
         self.clickTick.clicked.connect(self.setChooseWithMouse)
-        self.spinx.valueChanged.connect(self.showConfig)
-        self.spiny.valueChanged.connect(self.showConfig)
-        self.spinz.valueChanged.connect(self.showConfig)
-        self.quatspinw.valueChanged.connect(self.showConfig)
-        self.quatspinx.valueChanged.connect(self.showConfig)
-        self.quatspiny.valueChanged.connect(self.showConfig)
-        self.quatspinz.valueChanged.connect(self.showConfig)
+        self.jointConfig[0].valueChanged.connect(lambda: self.setConfig(0))
+        self.jointConfig[1].valueChanged.connect(lambda: self.setConfig(1))
+        self.jointConfig[2].valueChanged.connect(lambda: self.setConfig(2))
+        self.jointConfig[3].valueChanged.connect(lambda: self.setConfig(3))
+        self.jointCombo.currentIndexChanged.connect(self.findSize)
 
         self.update ()
 
@@ -199,7 +182,13 @@ class _RbprmPath (QtGui.QWidget):
             if (obj == self.lastObject):
                 self.affAnalysisObjects.setCurrentIndex(1 + objects.index(obj))
         self.configTree.clear()
+        self.jointCombo.clear()
         if hasattr(self.plugin.builder, 'name'):
+            joints = self.plugin.basicClient.robot.getJointNames()
+            for joint in joints:
+                self.jointCombo.addItem(joint)
+            if hasattr (self, 'currentJoint'):
+                self.jointCombo.setCurrentIndex(self.jointCombo.findText(self.currentJoint))
             if (self.initConfigSet):
                 item = QtGui.QTreeWidgetItem()
                 item.setText(0,"initial")
@@ -219,7 +208,30 @@ class _RbprmPath (QtGui.QWidget):
                     item.addChild(child)
                 self.configTree.addTopLevelItem(item)
                 self.configTree.expandItem(item)
-        
+
+    def findSize (self):
+        if (hasattr (self.plugin.builder, 'name')):
+            joint = str(self.jointCombo.currentText)
+            if joint != "":
+                self.configSize = self.plugin.basicClient.robot.getJointConfigSize (joint)
+                config = self.plugin.basicClient.robot.getJointConfig (joint)
+                bounds = self.plugin.basicClient.robot.getJointBounds (joint)
+                if (checkBounds (bounds) == False):
+                    for i in range (self.configSize):
+                        bounds[i*2] = -1000; bounds[i*2 +1] = 1000
+                for i in range (len(self.labels)):
+                    self.labels[i].setHidden(True)
+                    self.jointConfig[i].setHidden(True)
+                if self.configSize < 5:
+                    for i in range (self.configSize):
+                        self.jointConfig[i].setHidden(False)
+                        self.jointConfig[i].setRange(bounds[i*2], bounds[i*2 +1])
+                        self.jointConfig[i].setValue(config[i])
+                        self.labels[i].setHidden(False)
+                else:
+                    print ("Too many degrees of freedom for joint.")
+
+
     def addWidgetsInHBox(self, widgets):
         nameParentW = QtGui.QWidget(self)
         hboxName = QtGui.QHBoxLayout(nameParentW)
@@ -236,53 +248,83 @@ class _RbprmPath (QtGui.QWidget):
     def Robot (self):
         self.robotdialog = _RobotDialog()
         if self.robotdialog.exec_():
-            name = str(self.robotdialog.Envname.text)
-            packageName = str(self.robotdialog.pkgName.text)
-            urdfName =  str(self.robotdialog.urdfName.text)
-            meshPackageName = str(self.robotdialog.mpkgName.text)
+            info = []
+            info.append (str(self.robotdialog.Envname.text))
+            info.append (str(self.robotdialog.urdfName.text))
             urdfROMs = str(self.robotdialog.urdfromName.text)
             urdfROMs = urdfROMs.replace(" ", "")
-            urdfNameRom = urdfROMs.split(',')
-            rootJointType = str(self.robotdialog.rootJoint.currentText)
-            urdfSuffix = str(self.robotdialog.urdfSuf.text)
-            srdfSuffix = str(self.robotdialog.srdfSuf.text)
-            self.plugin.builder.loadModel(urdfName, urdfNameRom, rootJointType, \
-                    meshPackageName, packageName, urdfSuffix, srdfSuffix)
+            info.append (urdfROMs.split(','))
+            info.append (str(self.robotdialog.rootJoint.currentText))
+            info.append (str(self.robotdialog.mpkgName.text))
+            info.append (str(self.robotdialog.pkgName.text))
+            info.append (str(self.robotdialog.urdfSuf.text))
+            info.append (str(self.robotdialog.srdfSuf.text))
+            self.latestRobotInfo = info
+#            self.plugin.builder.loadModel(urdfName, urdfNameRom, rootJointType, \
+#                    meshPackageName, packageName, urdfSuffix, srdfSuffix)
+            t = Thread(target=self.loadRobot, args=(self, info))
+            t.start()
+            while t.is_alive():
+                QtCore.QCoreApplication.processEvents()
+                time.sleep(0.2)
             if (self.plugin.viewCreated == False):
                 self.plugin.main.createView("window_hpp_") #TODO: find way of adding view of custom name
                 self.plugin.viewCreated = True
             self.addToViewer()
+            self.plugin.client.gui.setVisibility(self.plugin.builder.name, "ON")
         self.update()
+
+    def loadRobot (self, tab, info):
+        tab.plugin.builder.loadModel (info[1],info[2],info[3],\
+                info[4], info[5],info[6], info[7])
 
     def Environment (self):
         self.envdialog = _EnvDialog()
         if hasattr(self.plugin.builder, 'name'):
             if self.envdialog.exec_():
-                name = str(self.envdialog.Envname.text)
-                urdfName =  str(self.envdialog.urdfName.text)
-                packageName = str(self.envdialog.pkgName.text)
-                self.r.loadObstacleModel (packageName, urdfName, name)
+                info = []
+                info.append (str(self.envdialog.pkgName.text))
+                info.append (str(self.envdialog.urdfName.text))
+                info.append (str(self.envdialog.Envname.text))
+                self.latestEnvironmentInfo = info
+                t = Thread(target=self.loadEnvironment, args=(self.plugin.r, info))
+                t.start()
+                while t.is_alive():
+                    QtCore.QCoreApplication.processEvents()
+                    time.sleep(0.2)
             self.update()
         else:
             print ("Please load ROM robot before environment.")
+
+    def loadEnvironment (self, viewer, info):
+        viewer.loadObstacleModel (info[0],info[1],info[2])
 
     def JointBounds (self):
         if hasattr(self.plugin.builder, 'name'):
             self.boundsdialog = _BoundsDialog(self.plugin)
             if self.boundsdialog.exec_():
-                name = str(self.boundsdialog.jointList.currentItem().text())
-                bounds = [self.boundsdialog.minx.value, self.boundsdialog.maxx.value,\
-                        self.boundsdialog.miny.value, self.boundsdialog.maxy.value,\
-                        self.boundsdialog.minz.value, self.boundsdialog.maxz.value]
-                self.plugin.builder.setJointBounds (name, bounds)
+                name = str(self.boundsdialog.jointTree.currentItem().text(0))
+                bounds = []
+                for i in range(2*self.boundsdialog.configSize):
+                    bounds.append(self.boundsdialog.bounds[i].value)
+                if checkBounds(bounds):
+                    self.plugin.builder.setJointBounds (name, bounds)
+                    if name == str(self.jointCombo.currentText):
+                        for i in range (len(bounds)/2):
+                            self.jointConfig[i].setRange(bounds[i*2], bounds[i*2 +1])
                 if self.boundsdialog.tick.isChecked():
-                    quatbounds = [self.boundsdialog.quatminx.value, self.boundsdialog.quatmaxx.value,\
-                        self.boundsdialog.quatminy.value, self.boundsdialog.quatmaxy.value,\
-                        self.boundsdialog.quatminz.value, self.boundsdialog.quatmaxz.value]
-                    self.plugin.builder.boundSO3(quatbounds)
-                    self.plugin.SO3bounds = quatbounds
+                    quatbounds = []
+                    for i in range (len(self.boundsdialog.quatbounds)):
+                        quatbounds.append(self.boundsdialog.quatbounds[i].value)
+                    if checkBounds(quatbounds):
+                        self.plugin.builder.boundSO3(quatbounds)
+                        self.plugin.SO3bounds = quatbounds
         else:
             print ("Please add ROM robot before setting bounds")
+
+    
+
+
 
     def Affordance (self):
         self.affdialog = _AffDialog(self.plugin)
@@ -317,7 +359,7 @@ class _RbprmPath (QtGui.QWidget):
 
     def addToViewer (self):
         self.ps = ProblemSolver(self.plugin.builder)
-        self.r = Viewer(self.ps)
+        self.plugin.r = Viewer(self.ps)
 
     def str2float (self, text):
         str1 = str(text).replace(" ", "")
@@ -327,40 +369,34 @@ class _RbprmPath (QtGui.QWidget):
             flist.append(float(s))
         return flist
 
-    def showConfig(self):
+    def setConfig(self, idx):
         if hasattr(self.plugin.builder, 'name'):
-            conf = self.plugin.builder.getCurrentConfig()
-            conf[0:3] = [float(self.spinx.value), float(self.spiny.value), float(self.spinz.value)]
-            conf[3:7] = normalise([float(self.quatspinw.value), float(self.quatspinx.value),\
-                    float(self.quatspiny.value), float(self.quatspinz.value)])
-            self.r (conf)
-            if  self.analysed:
+            joint = str(self.jointCombo.currentText)
+            config = self.plugin.basicClient.robot.getJointConfig(joint)
+            configSize = self.plugin.basicClient.robot.getJointConfigSize(joint)
+            if configSize < 5:
+                config[idx] = self.jointConfig[idx].value
+            self.plugin.basicClient.robot.setJointConfig(joint, config)
+            conf = self.plugin.basicClient.robot.getCurrentConfig()
+            self.plugin.r(conf)
+            # if affordance analysis done and robot is the ROM robot, not fullbody, validate config:
+            if (self.analysed and self.plugin.basicClient.robot.getRobotName() == self.plugin.builder.name):
                 if self.plugin.rbprmClient.rbprm.validateConfiguration(conf):
                     self.validator.setStyleSheet("background-color: green")
                 else:
                     self.validator.setStyleSheet("background-color: red")
-            self.update()
 
     def addConfig (self):
-    #    configSize = self.plugin.basicClient.robot.getConfigSize()
         conf = self.plugin.builder.getCurrentConfig()
-          #  conf = self.str2float(str(self.initq.text))
-        conf = self.plugin.builder.getCurrentConfig()
-        conf[0:3] = [float(self.spinx.value), float(self.spiny.value), float(self.spinz.value)]
-        conf[3:7] = normalise([float(self.quatspinw.value), float(self.quatspinx.value),\
-                    float(self.quatspiny.value), float(self.quatspinz.value)])
-           #== configSize:
         if str(self.configCombo.currentText) == 'initial':
             self.plugin.basicClient.problem.setInitialConfig(conf)
             self.plugin.builder.setCurrentConfig(conf)
             self.q_init = conf
             self.initConfigSet = True
         else:
-            #conf = self.str2float(str(self.goalq.text))
-            #if len(conf) == configSize:
             self.plugin.basicClient.problem.addGoalConfig(conf)
             self.q_goal = conf
-        self.spinConfig(conf)
+        self.currentJoint = self.jointCombo.currentText
         self.update ()
 
     def clearConfigs (self):
@@ -371,6 +407,7 @@ class _RbprmPath (QtGui.QWidget):
             self.initConfigSet = False
         else:
             self.plugin.basicClient.problem.resetGoalConfigs()
+        self.currentJoint = self.jointCombo.currentText
         self.update()
 
     def qvector2float (self, p):
@@ -379,15 +416,19 @@ class _RbprmPath (QtGui.QWidget):
 
     def spinConfig (self, conf):
         if len (conf) > 2:
-            self.spinx.setValue(conf[0])
-            self.spiny.setValue(conf[1])
-            self.spinz.setValue(conf[2])
-            if len (conf) == 7:
-                self.quatspinw.setValue(conf[3])
-                self.quatspinx.setValue(conf[4])
-                self.quatspiny.setValue(conf[5])
-                self.quatspinz.setValue(conf[6])
-        #self.showConfig()
+            # need to check rootjoint type -> this is only valid for freeflyer (and xy planar?)
+            joints = self.plugin.basicClient.robot.getJointNames()
+            # first element is base as joint names in the same order as in the configuration
+            pos = self.plugin.basicClient.robot.getJointConfig(joints[0])
+            pos[0:2] = conf[0:2] # do not change z position
+            self.plugin.basicClient.robot.setJointConfig(joints[0], pos)
+            idx = self.jointCombo.findText(joints[0])
+            if idx >= 0:
+                self.jointCombo.setCurrentIndex(idx)
+            q = self.plugin.basicClient.robot.getCurrentConfig()
+            self.currentJoint = self.jointCombo.currentText
+            self.update ()
+            self.plugin.r(q)
 
     def setChooseWithMouse (self):
         self.plugin.chooseWithMouse = True
@@ -415,9 +456,15 @@ class _RbprmPath (QtGui.QWidget):
         self.lastAff = affType
         if objectname == "All objects":
             objectname = ""
-            self.plugin.affClient.affordance.analyseAll ()
+         #   self.plugin.affClient.affordance.analyseAll ()
+            t = Thread(target=self.analyseAll)
         else:
-            self.plugin.affClient.affordance.analyseObject (objectname)
+            t = Thread(target=self.analyseObject, args=(objectname,))
+         #   self.plugin.affClient.affordance.analyseObject (objectname)
+        t.start()
+        while t.is_alive():
+            QtCore.QCoreApplication.processEvents()
+            time.sleep(0.2)
         if affType == "All types":
             affordances = self.getAffordanceTypes ()
             for aff in affordances:
@@ -426,6 +473,12 @@ class _RbprmPath (QtGui.QWidget):
             self.visualiseAffordances(affType, self.colour, objectname)
         self.analysed = True
         self.update ()
+
+    def analyseAll (self):
+        self.plugin.affClient.affordance.analyseAll ()
+
+    def analyseObject (self, objectname):
+        self.plugin.affClient.affordance.analyseObject (objectname)
 
     def getAffordancePoints (self, affordanceType):
         return self.plugin.affClient.affordance.getAffordancePoints (affordanceType)
@@ -483,8 +536,6 @@ class _RbprmPath (QtGui.QWidget):
           scenes = self.plugin.client.gui.getSceneList() #TODO: add check to see whether scenes is empty
           groupNodes = self.plugin.client.gui.getGroupNodeList('hpp-gui')
           self.plugin.client.gui.addToGroup (str (affType), 'hpp-gui')
-          # By default, oldest node is displayed in front. Removing and re-adding i
-          # object from scene assure that the new triangles are displayed on top     
           for groupNode in groupNodes :
               self.plugin.client.gui.removeFromGroup(groupNode,'hpp-gui')
               self.plugin.client.gui.addToGroup(groupNode,'hpp-gui')
@@ -501,30 +552,6 @@ class _RbprmPath (QtGui.QWidget):
     def getAffRefObstacles (self, affType):
         return self.plugin.affClient.affordance.getAffRefObstacles (affType)
 
-    def deleteAffordances (self, obstacleName=""):
-        self.deleteAffordancesFromViewer (obstacleName)
-        return self.plugin.affClient.affordance.deleteAffordances (obstacleName)
-
-    def deleteAffordancesFromViewer (self, obstacleName=""):
-        affs = self.getAffordanceTypes ()
-        if obstacleName == "":
-            for aff in affs:
-                self.deleteNode (aff, True)
-        else:
-           import re
-           for aff in affs:
-             refs = self.getAffRefObstacles (aff)
-             count = 0
-             while count < len(refs):
-               if refs[count] == obstacleName:
-                 toDelete = aff + '-' + refs[count]
-                 nodes = self.plugin.client.gui.getGroupNodeList(aff)
-                 for node in nodes:
-                   splt = re.split ('\.', node)
-                   if splt[0] == toDelete:
-                     self.deleteNode (node, True)
-               count += 1
-
     def deleteAffordancesByType (self):
         objectname = str(self.affAnalysisObjects.currentText)
         self.lastObject = objectname
@@ -534,6 +561,9 @@ class _RbprmPath (QtGui.QWidget):
             objectname = ""
         if affType == "All types":
             affType == ""
+            affs = self.getAffordanceTypes()
+            for aff in affs:
+                self.deleteAffordancesByTypeFromViewer (aff, objectname)
             self.plugin.affClient.affordance.deleteAffordances(objectname)
         else:
             self.deleteAffordancesByTypeFromViewer (affType, objectname)
@@ -570,133 +600,133 @@ class _BoundsDialog(QtGui.QDialog):
         self.setWindowTitle('Input dialog')
         # Create widgets
         label = QtGui.QLabel("Translation bounds for robot joints")
-        self.jointList = QtGui.QListWidget()
+        self.jointTree = QtGui.QTreeWidget()
         self.boundsTree = QtGui.QTreeWidget()
-        self.minx = QtGui.QDoubleSpinBox()
-        self.minx.setRange(-1000,1000)
-        self.maxx = QtGui.QDoubleSpinBox()
-        self.maxx.setRange(-1000,1000)
-        self.miny = QtGui.QDoubleSpinBox()
-        self.miny.setRange(-1000,1000)
-        self.maxy = QtGui.QDoubleSpinBox()
-        self.maxy.setRange(-1000,1000)
-        self.minz = QtGui.QDoubleSpinBox()
-        self.minz.setRange(-1000,1000)
-        self.maxz = QtGui.QDoubleSpinBox()
-        self.maxz.setRange(-1000,1000)
-        self.minx.setSingleStep (0.05)
-        self.maxx.setSingleStep (0.05)
-        self.miny.setSingleStep (0.05)
-        self.maxy.setSingleStep (0.05)
-        self.minz.setSingleStep (0.05)
-        self.maxz.setSingleStep (0.05)
-        self.minx.setValue (-2)
-        self.maxx.setValue (5)
-        self.miny.setValue (-1)
-        self.maxy.setValue (1)
-        self.minz.setValue (0.3)
-        self.maxz.setValue (4)
-        text1 = QtGui.QLabel('x translation')
-        text2 = QtGui.QLabel('y translation')
-        text3 = QtGui.QLabel('z translation')
-
+        self.groupbox0 = QtGui.QGroupBox()
+        self.grid1 = QtGui.QGridLayout(self.groupbox0)
+        self.bounds = []
+        for i in range(0,8):
+            self.bounds.append(QtGui.QDoubleSpinBox())
+            self.bounds[i].setRange(-1000,1000)
+            self.bounds[i].setSingleStep (0.05)
+        self.labels = []
+        for i in range (0,4):
+            self.labels.append(QtGui.QLabel("variable " + str(i)))
         self.tick = QtGui.QCheckBox("Set rotation bounds for robot base in rbprm shooter")
-        #self.tick.setHidden(True)
         self.tick.setCheckable(True)
 
         # add widgets to grid
         self.grid.addWidget (label, 0,0)
-        self.grid.addWidget (self.jointList, 1,0,1,1)
-        self.grid.addWidget (self.boundsTree, 1,1,1,2)
-        self.grid.addWidget (text1, 2,0)
-        self.grid.addWidget (self.minx, 2,1)
-        self.grid.addWidget (self.maxx, 2,2)
-        self.grid.addWidget (text2, 3,0)
-        self.grid.addWidget (self.miny, 3,1)
-        self.grid.addWidget (self.maxy, 3,2)
-        self.grid.addWidget (text3, 4,0)
-        self.grid.addWidget (self.minz, 4,1)
-        self.grid.addWidget (self.maxz, 4,2)
-        self.grid.addWidget (self.tick, 5,0,1,2)
+        self.grid.addWidget (self.jointTree, 1,0,3,1)
+        self.grid.addWidget (self.boundsTree, 1,1,3,1)
+        self.grid1.addWidget (self.labels[0], 0,0)
+        self.grid1.addWidget (self.bounds[0], 0,1)
+        self.grid1.addWidget (self.bounds[1], 0,2)
+        self.grid1.addWidget (self.labels[1], 1,0)
+        self.grid1.addWidget (self.bounds[2], 1,1)
+        self.grid1.addWidget (self.bounds[3], 1,2)
+        self.grid1.addWidget (self.labels[2], 2,0)
+        self.grid1.addWidget (self.bounds[4], 2,1)
+        self.grid1.addWidget (self.bounds[5], 2,2)
+        self.grid1.addWidget (self.labels[3], 3,0)
+        self.grid1.addWidget (self.bounds[6], 3,1)
+        self.grid1.addWidget (self.bounds[7], 3,2)
+        self.grid.addWidget (self.tick, 8,0,1,2)
 
         # create grid 2 and its widgets
         self.groupbox = QtGui.QGroupBox()
         self.grid2 = QtGui.QGridLayout(self.groupbox)
         self.grid2.setSpacing(10)
-        self.quatminx = QtGui.QDoubleSpinBox()
-        self.quatminx.setRange(-1000,1000)
-        self.quatmaxx = QtGui.QDoubleSpinBox()
-        self.quatmaxx.setRange(-1000,1000)
-        self.quatminy = QtGui.QDoubleSpinBox()
-        self.quatminy.setRange(-1000,1000)
-        self.quatmaxy = QtGui.QDoubleSpinBox()
-        self.quatmaxy.setRange(-1000,1000)
-        self.quatminz = QtGui.QDoubleSpinBox()
-        self.quatminz.setRange(-1000,1000)
-        self.quatmaxz = QtGui.QDoubleSpinBox()
-        self.quatmaxz.setRange(-1000,1000)
-        self.quatminx.setSingleStep (0.05)
-        self.quatmaxx.setSingleStep (0.05)
-        self.quatminy.setSingleStep (0.05)
-        self.quatmaxy.setSingleStep (0.05)
-        self.quatminz.setSingleStep (0.05)
-        self.quatmaxz.setSingleStep (0.05)
-        self.quatminx.setValue (-0.4)
-        self.quatmaxx.setValue (0.4)
-        self.quatminy.setValue (-3)
-        self.quatmaxy.setValue (3)
-        self.quatminz.setValue (-3)
-        self.quatmaxz.setValue (3)
-        text4 = QtGui.QLabel('x rotation')
-        text5 = QtGui.QLabel('y rotation')
-        text6 = QtGui.QLabel('z rotation')
+        self.quatbounds = []
+        for i in range(0,6):
+            self.quatbounds.append(QtGui.QDoubleSpinBox())
+            self.quatbounds[i].setRange(-1000,1000)
+            self.quatbounds[i].setSingleStep (0.05)
+        self.quatlabels = []
+        for i in range (0,3):
+            self.quatlabels.append(QtGui.QLabel("variable " + str(i)))
+        if (checkBounds(self.plugin.SO3bounds)):
+            for i in range (len(self.quatbounds)):
+                self.quatbounds[i].setValue(self.plugin.SO3bounds[i])
+        else:
+            self.quatbounds[0].setValue(-0.4); self.quatbounds[1].setValue(0.4); self.quatbounds[2].setValue(-3)
+            self.quatbounds[3].setValue(3); self.quatbounds[4].setValue(-3); self.quatbounds[5].setValue(3)
+
         self.OKbutton = QtGui.QPushButton("Set bounds")
         self.CANCELbutton = QtGui.QPushButton("Cancel")
 
         # add widgets to grid2
-        self.grid2.addWidget (label, 0,0)
-        self.grid2.addWidget (text4, 1,0)
-        self.grid2.addWidget (self.quatminx, 1,1)
-        self.grid2.addWidget (self.quatmaxx, 1,2)
-        self.grid2.addWidget (text5, 2,0)
-        self.grid2.addWidget (self.quatminy, 2,1)
-        self.grid2.addWidget (self.quatmaxy, 2,2)
-        self.grid2.addWidget (text6, 3,0)
-        self.grid2.addWidget (self.quatminz, 3,1)
-        self.grid2.addWidget (self.quatmaxz, 3,2)
-
-        self.grid.addWidget (self.groupbox,6,0,3,2)
+        #self.grid2.addWidget (label, 0,0)
+        self.grid2.addWidget (self.quatlabels[0], 1,0)
+        self.grid2.addWidget (self.quatbounds[0], 1,1)
+        self.grid2.addWidget (self.quatbounds[1], 1,2)
+        self.grid2.addWidget (self.quatlabels[1], 2,0)
+        self.grid2.addWidget (self.quatbounds[2], 2,1)
+        self.grid2.addWidget (self.quatbounds[3], 2,2)
+        self.grid2.addWidget (self.quatlabels[2], 3,0)
+        self.grid2.addWidget (self.quatbounds[4], 3,1)
+        self.grid2.addWidget (self.quatbounds[5], 3,2)
+                
+        self.grid.addWidget (self.groupbox0,4,0,4,2)
+        self.grid.addWidget (self.groupbox,9,0,3,2)
         self.groupbox.setHidden(True)
-        self.grid.addWidget (self.CANCELbutton, 9,0,1,1)
-        self.grid.addWidget (self.OKbutton, 9,1,1,1)
+        self.grid.addWidget (self.CANCELbutton, 12,0,1,1)
+        self.grid.addWidget (self.OKbutton, 12,1,1,1)
 
         # Set dialog layout
         self.setLayout(self.grid)
         # Add button signal to showDetails slot
-        #self.jointList.currentItemChanged.connect(lambda: self.hideWidgetCustom(self.jointList.currentItem()))
+        self.jointTree.currentItemChanged.connect(self.findSize)
         self.tick.clicked.connect(lambda: self.hideWidget(self.groupbox, self.tick))
         self.OKbutton.clicked.connect(self.load)
         self.CANCELbutton.clicked.connect(self.cancel)
         self.update()
 
+    def child (self, item):
+        children = self.plugin.basicClient.robot.getChildJointNames(str(item.text(0)))
+        if len(children) > 0:
+            for ch in children:
+                childItem = QtGui.QTreeWidgetItem()
+                childItem.setText(0,str(ch))
+                item.addChild(childItem)
+                self.child (childItem)
+        return item
+
+    def expand (self, tree, topItem):
+        child_count = topItem.childCount()
+        for ch in range (child_count):
+            item = topItem.child(ch)
+            self.expand(tree, item)
+        tree.expandItem(topItem)
+
     # methods
     def update(self):
-        self.jointList.clear()
+        self.jointTree.clear()
         self.boundsTree.clear()
-        joints = self.plugin.basicClient.robot.getJointNames()
+        joints = self.plugin.basicClient.robot.getAllJointNames()
+        if len(joints) > 0:
+            joint = joints[0]
+            it = QtGui.QTreeWidgetItem()
+            it.setText(0,joint)
+            item = self.child(it)
+            self.jointTree.addTopLevelItem(item)
+            self.expand(self.jointTree, item)
+            if hasattr (self, 'currentJoint'):
+                self.jointTree.setCurrentItem(self.currentJoint)
+            else:
+                self.jointTree.setCurrentItem(item)
         for joint in joints:
-            self.jointList.addItem(joint)
             bounds = self.plugin.basicClient.robot.getJointBounds (joint)
-            if (bounds[0] < bounds[1]):
-                item = QtGui.QTreeWidgetItem()
-                item.setText(0,joint)
-                child = QtGui.QTreeWidgetItem()
-                child.setText(0,str(bounds))
-                item.addChild(child)
-                self.boundsTree.addTopLevelItem(item)
-                self.boundsTree.expandItem(item)
-        self.jointList.setCurrentItem(self.jointList.item(0))
-        if (self.plugin.SO3bounds[0] < self.plugin.SO3bounds[1]):
+            if (len(bounds) > 1):
+                if (checkBounds(bounds)):
+                    item = QtGui.QTreeWidgetItem()
+                    item.setText(0,joint)
+                    child = QtGui.QTreeWidgetItem()
+                    child.setText(0,str(bounds))
+                    item.addChild(child)
+                    self.boundsTree.addTopLevelItem(item)
+                    self.boundsTree.expandItem(item)
+        if (checkBounds(self.plugin.SO3bounds)):
             item = QtGui.QTreeWidgetItem()
             item.setText(0,'So3bounds')
             child = QtGui.QTreeWidgetItem()
@@ -714,6 +744,29 @@ class _BoundsDialog(QtGui.QDialog):
             widget.setHidden(False)
         else:
             widget.setHidden(True)
+
+    def findSize (self):
+        self.currentJoint = self.jointTree.currentItem()
+        joint = str(self.jointTree.currentItem().text(0))
+        self.configSize = self.plugin.basicClient.robot.getJointConfigSize (joint)
+        bounds = self.plugin.basicClient.robot.getJointBounds (joint)
+        if self.configSize < 5:
+            for i in range (0,len(self.labels)):
+                self.labels[i].setHidden(True)
+            for i in range (0,len(self.bounds)):
+                self.bounds[i].setHidden(True)
+            for i in range (0,self.configSize):
+                self.bounds[i*2].setHidden(False)
+                self.bounds[i*2].setValue(bounds[i*2])
+                self.bounds[i*2+1].setHidden(False)
+                self.bounds[i*2+1].setValue(bounds[i*2+1])
+                self.labels[i].setHidden(False)
+        else:
+            print ("Too many degrees of freedom for joint.")
+        # TODO: setting certain values is only for now (quick setup)
+        if (checkBounds (bounds) == False):
+            self.bounds[0].setValue(-2); self.bounds[1].setValue(5); self.bounds[2].setValue(-1)
+            self.bounds[3].setValue(1); self.bounds[4].setValue(0.3); self.bounds[5].setValue(4)
 
     def hideWidgetCustom (self, listItem):
         joint = str(listItem.text())
@@ -902,7 +955,7 @@ class _EnvDialog(QtGui.QDialog):
         self.button.setCheckable(True)
 
         # add widgets to grid
-        self.grid.addWidget (label, 0,0)
+        self.grid.addWidget (label, 0,0,1,2)
         self.grid.addWidget (text1, 1,0)
         self.grid.addWidget (self.model, 1,1)
         self.grid.addWidget (text2,2,0,2,1)
@@ -1001,7 +1054,11 @@ class _AffDialog(QtGui.QDialog):
         self.setWindowTitle('Affordance settings')
         # Create widgets
         self.affordanceTypes = QtGui.QComboBox(self)
-        
+        self.affordanceTypes.clear()
+        affordances = self.getAffordanceConfigTypes()
+        for aff in affordances:
+            self.affordanceTypes.addItem (aff)
+
         self.ntm = QtGui.QDoubleSpinBox()
         self.ntm.setRange(0,1)
         self.nm = QtGui.QDoubleSpinBox()
@@ -1035,16 +1092,18 @@ class _AffDialog(QtGui.QDialog):
 
         # Set dialog layout
         self.setLayout(self.grid)
+        self.affordanceTypes.currentIndexChanged.connect(self.update)
         self.OKbutton.clicked.connect(self.load)
         self.CANCELbutton.clicked.connect(self.cancel)
         self.update()
 
     def update(self):
-        self.affordanceTypes.clear()
-        affordances = self.getAffordanceConfigTypes()
-        for aff in affordances:
-            self.affordanceTypes.addItem (aff)
-
+        aff = str(self.affordanceTypes.currentText)
+        config = self.plugin.affClient.affordance.getAffordanceConfig(aff)
+        self.nm.setValue(config[0])
+        self.ntm.setValue(config[1])
+        self.ma.setValue(config[2])
+            
     def getAffordanceConfigTypes (self):
         return self.plugin.affClient.affordance.getAffordanceConfigTypes ()
 
@@ -1063,6 +1122,10 @@ class _RbprmInterp (QtGui.QWidget):
         self.plugin.SO3bounds = [1,0,1,0,1,0]
         self.configs = []
         self.tolerance = -1
+        self.startPoint = 0
+        self.paused = False
+        self.stopped = False
+        self.interrupted = False
        # self.exampleThread = QtCore.QThread()
         vbox1 = QtGui.QVBoxLayout(self)
         gridW = QtGui.QWidget()#(self)
@@ -1101,19 +1164,20 @@ class _RbprmInterp (QtGui.QWidget):
         self.solveStatus.setAlignment(QtCore.Qt.AlignCenter)
         self.solveStatus.setStyleSheet("background-color: blue")
         vbox1.addWidget(self.addWidgetsInHBox([self.bindFunctionToButton("Solve", self.solve),\
-                self.solveStatus]))
+                self.solveStatus, self.bindFunctionToButton("Interrupt", self.interruptPathPlanning)]))
 
+        self.space = QtGui.QLabel("")
         self.computeStatus = QtGui.QLabel()
         self.computeStatus.setAlignment(QtCore.Qt.AlignCenter)
         self.computeStatus.setStyleSheet("background-color: blue")
         vbox1.addWidget(self.addWidgetsInHBox([self.bindFunctionToButton("Load full-body model",\
                 self.Fullbody), self.bindFunctionToButton("Load limb models", self.Limb)]))
         vbox1.addWidget(self.addWidgetsInHBox([self.bindFunctionToButton("Compute contacts",\
-                self.computeContacts), self.computeStatus]))
+                self.computeContacts), self.computeStatus, self.space]))
         self.slider = QtGui.QSlider(QtCore.Qt.Horizontal)
-        self.slider.setMinimum(1)
+        self.slider.setMinimum(0)
         self.slider.setMaximum(100)
-        self.slider.setValue(1)
+        self.slider.setValue(0)
         self.slider.setTickInterval(1)
         
         self.play = QtGui.QPushButton()
@@ -1125,7 +1189,9 @@ class _RbprmInterp (QtGui.QWidget):
         vbox1.addWidget(self.addWidgetsInHBox([self.play, self.stop, self.pause, self.slider]))
         self.play.setDisabled(True)
 
-        self.play.clicked.connect(self.playConfigs) 
+        self.play.clicked.connect(self.playConfigs)
+        self.stop.clicked.connect(self.stopPlayer)
+        self.pause.clicked.connect(self.pausePlayer)
         self.slider.valueChanged.connect(self.draw)
         
         vbox1 = QtGui.QVBoxLayout(self)
@@ -1208,6 +1274,7 @@ class _RbprmInterp (QtGui.QWidget):
             info.append (str(self.fbdialog.pkgName.text))
             info.append (str(self.fbdialog.urdfSuf.text))
             info.append (str(self.fbdialog.srdfSuf.text))
+            self.latestFullbodyInfo = info
             t = Thread(target=self.loadFullbody, args=(self, info))
             t.start()
             while t.is_alive():
@@ -1241,12 +1308,13 @@ class _RbprmInterp (QtGui.QWidget):
                 info.append (float(tab.res.value))
                 info.append (str(tab.cType.currentText))
                 infos.append(info)
+                self.latesLimbInfos = infos
             t = Thread(target=self.loadLimbs, args=(self, infos))
             t.start()
             while t.is_alive():
                 QtCore.QCoreApplication.processEvents()
                 time.sleep(0.2)
-            self.r(self.plugin.fullbody.getCurrentConfig())
+            self.plugin.r(self.plugin.fullbody.getCurrentConfig())
             self.update()
 
     def loadLimbs(self, tab, infos):
@@ -1272,7 +1340,7 @@ class _RbprmInterp (QtGui.QWidget):
                 while t.is_alive():
                     QtCore.QCoreApplication.processEvents()
                     time.sleep(0.2)
-                self.r(self.q_init)
+                self.plugin.r(self.q_init)
                 self.computeStatus.setText("Done")
                 self.computeStatus.setStyleSheet("background-color: green")
                 self.play.setDisabled(False)
@@ -1289,20 +1357,39 @@ class _RbprmInterp (QtGui.QWidget):
         tab.q_goal = tab.plugin.fullbody.generateContacts(q_goal, [0,0,1])
         tab.plugin.fullbody.setStartState(q_init,[])
         tab.plugin.fullbody.setEndState(q_goal,tab.legIds)        
-        tab.configs = self.plugin.fullbody.interpolate(0.1, 1, 0)
+        configs = self.plugin.fullbody.interpolate(0.1, 1, 0)
+        tab.configs = configs[1:len(configs)-1]
 
     def playConfigs (self):
         self.resetStatus()
+        self.stopped = False
+        self.paused = False
+        start = self.startPoint
         if len (self.configs) > 0:
-            for i in range(0,len(self.configs)):
+            for i in range(start,len(self.configs) -1):
                 QtCore.QCoreApplication.processEvents()
                 self.slider.setValue(i)
+                if (self.paused):
+                    self.startPoint = i
+                    return
+                elif (self.stopped):
+                    self.startPoint = 0
+                    self.slider.setValue(1)
+                    return
                 time.sleep (0.2)
-                
+        self.startPoint = 0
+
+    def stopPlayer (self):
+        self.stopped = True
+        self.startPoint = 0
+        self.slider.setValue(1)
+
+    def pausePlayer (self):
+        self.paused = True
 
     def addToViewer (self):
         self.ps = ProblemSolver(self.plugin.fullbody)
-        self.r = Viewer(self.ps)
+        self.plugin.r = Viewer(self.ps)
 
     def str2float (self,text):
         str1 = str(text).replace(" ", "")
@@ -1315,7 +1402,7 @@ class _RbprmInterp (QtGui.QWidget):
     def draw(self, i):
         if len(self.configs) > 0:
             config = self.configs[i]
-            self.plugin.fullbody.draw(config, self.r)
+            self.plugin.fullbody.draw(config, self.plugin.r)
 
     def showConfig(self):
         if str(self.configCombo.currentText) == 'initial':
@@ -1323,10 +1410,11 @@ class _RbprmInterp (QtGui.QWidget):
         else:
             q = self.str2float(self.goalq.text)
         if len(q) == self.plugin.basicClient.robot.getConfigSize():
-            self.r (q)
+            self.plugin.r (q)
         self.update()
 
     def resetStatus (self):
+        self.interrupted = False
         self.solveStatus.setText("")
         self.solveStatus.setStyleSheet("background-color: blue")
         self.computeStatus.setText("")
@@ -1353,6 +1441,11 @@ class _RbprmInterp (QtGui.QWidget):
             if (len (goals)) < 1:
                 print ("Please add goal configuration before solving.")
             else:
+                init = self.plugin.basicClient.problem.getInitialConfig()
+                for i in range (len(goals)):
+                    if equal(init, goals[i]):
+                        print ("Initial and goal configuration should not be equal.")
+                        return
                 self.solveStatus.setText("Solving")
                 self.solveStatus.setStyleSheet("background-color: yellow")
                 t = Thread(target=self.solver, args=(self,))
@@ -1360,13 +1453,20 @@ class _RbprmInterp (QtGui.QWidget):
                 while t.is_alive():
                     QtCore.QCoreApplication.processEvents()
                     time.sleep(0.2)
-                #self.plugin.basicClient.problem.solve()
-                self.solveStatus.setText("Done")
-                self.solveStatus.setStyleSheet("background-color: green")
+                if (self.interrupted):
+                    self.solveStatus.setText("Interrupted")
+                    self.solveStatus.setStyleSheet("background-color: red")
+                else:
+                    self.solveStatus.setText("Done")
+                    self.solveStatus.setStyleSheet("background-color: green")
                 self.update()
 
     def solver (self, tab):
         tab.plugin.basicClient.problem.solve()
+
+    def interruptPathPlanning(self):
+        self.plugin.basicClient.problem.interruptPathPlanning()
+        self.interrupted = True
 
 
 #------------------------------------------------------------------end _RbprmInterp
@@ -1411,8 +1511,13 @@ class Plugin(QtGui.QDockWidget):
     ### If present, this function is called when a new OSG Widget is created.
     def osgWidget(self, osgWindow):
         osgWindow.connect('selected(QString,QVector3D)', self.selected)
-        #osgWindow.setMouseTracking(True)
-        #osgWindow.connect('mouseMoveEvent(QtCore.QEvent.MouseMove)',self.mouseMove)
+        osgWindow.setMouseTracking(True)
+        self.osg = osgWindow
+        self.osg.installEventFilter(self)
+        self.osg.acceptDrops = True
+        #label = QtGui.QLabel("t")
+        #label.mouseMoveEvent = self.mouseMoveEvent
+        #osgWindow.mouseMoveEvent = self.mouseMoveEvent #(QtCore.QEvent.MouseMove)',self.mouseMove)
         
         #osgWindow.cursor.pos()connect('')
 
@@ -1433,11 +1538,22 @@ class Plugin(QtGui.QDockWidget):
         self.rbprmInterp.update()
         self.rbprmPath.update()
 
-    def mouseMove (self):
-        print ("moved mouse")
+    def mouseMoveEvent (self, mouseEvent):
+        if (mouseEvent == QtCore.QEvent.MouseMove):
+            print ("moved mouse")
+
+    def eventFilter(self, source, event):
+        if (event.type() == QtCore.QEvent.MouseMove):# and
+            #source is self.osg):
+            print('mouse at:', event.x(), event.y())
+        #    print ("osg mouse:", source.)
+            return False
+        return QtGui.QWidget.eventFilter(self, source, event)
 
     def selected(self, name, posInWorldFrame):
         if (self.chooseWithMouse):
          #   QtGui.QMessageBox.information(self, "Selected object", name + " " + str(posInWorldFrame))
+            #if str(name).find(self.builder.name) > -1:
+            #    self.osg.cursor.setShape(QtCore.Qt.ClosedHandCursor)
             self.rbprmPath.spinConfig(self.rbprmPath.qvector2float (posInWorldFrame))
 
