@@ -940,6 +940,8 @@ class _LimbDialog(QtGui.QDialog):
 class _EnvDialog(QtGui.QDialog):
     def __init__(self, parent=None):
         super(_EnvDialog, self).__init__(parent)
+        self.settings = Settings()
+        self.infos = self.read()
         self.grid = QtGui.QGridLayout()
         self.grid.setSpacing(10)
         self.setGeometry(440,418, 450, 450)
@@ -1012,12 +1014,16 @@ class _EnvDialog(QtGui.QDialog):
             widget.setHidden(False)
         else:
             widget.setHidden(True)
+
+    def read(self):
+        return self.settings.readEnvironments()
         
 class _RobotDialog(_EnvDialog):
     def __init__(self, parent=None):
         super(_RobotDialog, self).__init__(parent)
         #self.grid2.removeWidget(self.envText6)
         #self.grid2.removeWidget(self.urdfromName)
+        self.infos = self.settings.readRobots()
         text = QtGui.QLabel('Root-joint type')
         self.rootJoint = QtGui.QComboBox()
         self.rootJoint.addItem("freeflyer")
@@ -1034,15 +1040,22 @@ class _RobotDialog(_EnvDialog):
         self.pkgName.setText("hpp-rbprm-corba")
         self.mpkgName.setText("hpp-rbprm-corba")
 
+    def read(self):
+        return self.settings.readRobots()
+
 class _FullBodyDialog (_RobotDialog):
      def __init__(self, parent=None):
         super(_FullBodyDialog, self).__init__(parent)
+
         self.Envname.setText("hyq")
         self.urdfName.setText("hyq")
         self.pkgName.setText("hyq_description")
         self.mpkgName.setText("hyq_description")
         self.envText6.setHidden(True)
         self.urdfromName.setHidden(True)
+
+        def read(self):
+            return self.settings.readFullbodies()
 
 class _AffDialog(QtGui.QDialog):
     def __init__(self, plugin, parent=None):
@@ -1507,13 +1520,6 @@ class Plugin(QtGui.QDockWidget):
         mainWindow.connect('refresh()', self.refresh)
         self.chooseWithMouse = False
         self.tabWidget.connect(self.tabWidget, QtCore.SIGNAL("currentChanged(int)"), self.updateSelected)
-        self.tryEnv()
-
-    def tryEnv(self):
-        import os
-        path = os.environ.get('CMAKE_PREFIX_PATH')
-        paths = path.split(':')
-        print ("settings :", paths)
 
     ### If present, this function is called when a new OSG Widget is created.
     def osgWidget(self, osgWindow):
@@ -1563,4 +1569,78 @@ class Plugin(QtGui.QDockWidget):
             #if str(name).find(self.builder.name) > -1:
             #    self.osg.cursor.setShape(QtCore.Qt.ClosedHandCursor)
             self.rbprmPath.spinConfig(self.rbprmPath.qvector2float (posInWorldFrame))
+#----------------------------------------------------------------------------------------- end plugin
+#----------------------------------------------------------------------------------------- start settings
+class Settings ():
+    def __init__(self):
+        path = ""
+        pathname = 'CMAKE_PREFIX_PATH'
+        env = QtCore.QProcessEnvironment.systemEnvironment()
+        if (env.contains(pathname)): 
+            paths = (str(env.value(pathname))).split(':')
+            for p in paths:
+               directory = QtCore.QDir(p + '/etc')
+               if directory.exists():
+                  path = directory.path() 
+                  break
+        QtCore.QSettings.setPath (QtCore.QSettings.IniFormat, QtCore.QSettings.SystemScope, str(path))
+        QtCore.QSettings.setPath (QtCore.QSettings.NativeFormat, QtCore.QSettings.SystemScope, str(path))
+        self.robots = []
+        self.envs = []
+        self.fullbodies = []
+
+    def readRobots(self):
+        # second argument is directory name as follows: path/[gepetto-gui]/[rbprmRobots].conf
+        robot = QtCore.QSettings (QtCore.QSettings.SystemScope,"gepetto-gui", "rbprmRoms")
+        #robot.setValue("test", "value");
+        #keys = robot.allKeys()
+        #print (keys)
+        if (robot.status () != QtCore.QSettings.NoError):
+            print ("Error occurred when opening rbprm-robot config file.")
+            return
+        else:
+            for child in robot.childGroups():
+                info = []
+                info.append (str(robot.value("RobotName", child)))
+                info.append (str(robot.value("ModelName", "")))
+                urdfROMs = str(robot.value("URDFRomNames", ""))
+                urdfROMs = urdfROMs.replace(" ", "")
+                info.append (urdfROMs.split(','))
+                info.append (str(robot.value("RootJointType", "freeflyer")))
+                info.append (str(robot.value("MeshPackage", "")))
+                info.append (str(robot.value("Package", "")))
+                info.append (str(robot.value("URDFSuffix", "")))
+                info.append (str(robot.value("SRDFSuffix", "")))
+                self.robots.append(info)
+                print ("going through elements", info)
+                
+    def readEnvironments(self):
+        env = QtCore.QSettings (QtCore.QSettings.SystemScope,"gepetto-gui", "rbprmEnvironments")
+        if (env.status () != QtCore.QSettings.NoError):
+            print ("Error occurred when opening rbprm-environment config file.")
+            return
+        else:
+            for child in env.childGroups():
+                info = []
+                info.append (str(env.value("Package","")))
+                info.append (str(env.value("URDFFilename", "")))
+                info.append (str(env.value("RobotName", child)))
+                self.envs.append(info)
+
+    def readFullbody (self):
+        fb = QtCore.QSettings (QtCore.QSettings.SystemScope,"gepetto-gui", "rbprmFullbodies")
+        if (fb.status () != QtCore.QSettings.NoError):
+            print ("Error occurred when opening rbprm-environment config file.")
+            return
+        else:
+            for child in fb.childGroups():
+            #TODO: FINISH!
+                info = []
+                info.append (str(fb.value("Package","")))
+                info.append (str(fb.value("URDFFilename", "")))
+                info.append (str(fb.value("RobotName", child)))
+                self.envs.append(info)
+
+
+
 
