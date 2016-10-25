@@ -259,9 +259,11 @@ class _RbprmPath (QtGui.QWidget):
             info.append (str(self.robotdialog.pkgName.text))
             info.append (str(self.robotdialog.urdfSuf.text))
             info.append (str(self.robotdialog.srdfSuf.text))
+            if (info[1] == "" or info[2] == "" or info[4] == "" or info[5] == ""):
+                print ("Please make sure you have provided a full description of the robot.")
+                return
             self.latestRobotInfo = info
-#            self.plugin.builder.loadModel(urdfName, urdfNameRom, rootJointType, \
-#                    meshPackageName, packageName, urdfSuffix, srdfSuffix)
+            #self.plugin.builder = Builder ()
             t = Thread(target=self.loadRobot, args=(self, info))
             t.start()
             while t.is_alive():
@@ -376,6 +378,7 @@ class _RbprmPath (QtGui.QWidget):
             configSize = self.plugin.basicClient.robot.getJointConfigSize(joint)
             if configSize < 5:
                 config[idx] = self.jointConfig[idx].value
+        #    print ("got here", joint, config, configSize)
             self.plugin.basicClient.robot.setJointConfig(joint, config)
             conf = self.plugin.basicClient.robot.getCurrentConfig()
             self.plugin.r(conf)
@@ -781,22 +784,16 @@ class _LimbTab (QtGui.QWidget):
         self.grid = QtGui.QGridLayout()
         self.grid.setSpacing(10)
         # Create widgets
-        label = QtGui.QLabel("Choose predefined model or provide custom description.")
-        self.model = QtGui.QComboBox()
-        self.model.editable = False
-        text1 = QtGui.QLabel('Choose predefined model')
+        label = QtGui.QLabel("Provide limb details.") 
         text2 = QtGui.QLabel('Limb name')
-        self.legId = QtGui.QLineEdit("rfleg")
-        self.button = QtGui.QPushButton("Details")
-        self.button.setCheckable(True)
+        self.legId = QtGui.QLineEdit("")
+        self.tick = QtGui.QCheckBox("Details")
 
         # add widgets to grid
         self.grid.addWidget (label, 0,0)
-        self.grid.addWidget (text1, 1,0)
-        self.grid.addWidget (self.model, 1,1)
         self.grid.addWidget (text2,2,0,2,1)
         self.grid.addWidget (self.legId, 2,1,2,1)
-        self.grid.addWidget (self.button, 4,1,1,1)
+        self.grid.addWidget (self.tick, 4,1,1,1)
         # create grid 2 and its widgets
         self.groupbox = QtGui.QGroupBox()
         self.grid2 = QtGui.QGridLayout(self.groupbox)
@@ -804,19 +801,22 @@ class _LimbTab (QtGui.QWidget):
         text3 = QtGui.QLabel('Constraint type')
         self.cType = QtGui.QComboBox()
         self.cType.addItem("_3_DOF")
+        self.cType.addItem("_6_DOF")
         text4 = QtGui.QLabel('First joint in URDF file')
-        self.leg = QtGui.QLineEdit("rf_haa_joint")
+        self.leg = QtGui.QLineEdit("")
         text5 = QtGui.QLabel('Last joint in URDF file')
-        self.foot = QtGui.QLineEdit("rf_foot_joint")
+        self.foot = QtGui.QLineEdit("")
         text6 = QtGui.QLabel('Offset between last joint and contact surface')
-        self.offset = QtGui.QLineEdit("0,-0.021,0")
+        self.offset = QtGui.QLineEdit("")
         text7 = QtGui.QLabel('Contact surface direciton for limb in rest pose')
-        self.normal = QtGui.QLineEdit("0,1,0")
+        self.normal = QtGui.QLineEdit("")
         text8 = QtGui.QLabel('Rectangular-contact-surface dimensions')
-        self.legxlegy = QtGui.QLineEdit("0.02,0.02")
+        self.legxlegy = QtGui.QLineEdit("")
         text9 = QtGui.QLabel('Heuristic')
         self.heur = QtGui.QComboBox()
         self.heur.addItem ("manipulability")
+        self.heur.addItem ("forward")
+        self.heur.addItem ("static")
         text10 = QtGui.QLabel ("Octree resolution")
         self.res = QtGui.QDoubleSpinBox()
         self.res.setSingleStep (0.05)
@@ -825,7 +825,7 @@ class _LimbTab (QtGui.QWidget):
         self.nbSamples = QtGui.QSpinBox()
         self.nbSamples.setMaximum(30000)
         self.nbSamples.setValue(20000)
-
+        self.disable = QtGui.QCheckBox("Disable effector collision")
 
         # add widgets to grid2
         self.grid2.addWidget (text3, 0,0)
@@ -846,96 +846,22 @@ class _LimbTab (QtGui.QWidget):
         self.grid2.addWidget (self.res, 7,1)
         self.grid2.addWidget (text11, 8,0)
         self.grid2.addWidget (self.nbSamples, 8,1)
+        self.grid2.addWidget (self.disable, 9, 0, 1, 2)
        
-
         self.grid.addWidget (self.groupbox,5,0,3,2)
         self.groupbox.setHidden(True)
 
         # Set dialog layout
         self.setLayout(self.grid)
         # Add button signal to showDetails slot
-        self.button.clicked.connect(lambda: self.hideWidget(self.groupbox, self.button))
+        self.tick.stateChanged.connect(lambda: self.hideWidget(self.groupbox, self.tick))
+        self.tick.setCheckState(QtCore.Qt.Checked)
 
-    def hideWidget (self,widget, button):
-        if button.isChecked():
+    def hideWidget (self,widget, tick):
+        if tick.checkState() == QtCore.Qt.Checked:
             widget.setHidden(False)
         else:
             widget.setHidden(True)
-
-class _LimbDialog(QtGui.QDialog):
-    def __init__(self, parent=None):
-        super(_LimbDialog, self).__init__(parent)
-        self.tabWidget = QtGui.QTabWidget()
-        self.setGeometry(440,470, 450, 490)
-        self.setWindowTitle('Input dialog')
-       #  self.tabWidget.addTab(self.tab, "tab")
-        self.tabs = [0]*4
-        text1 = QtGui.QLabel("Number of limbs")
-        self.limbs = QtGui.QSpinBox()
-        self.limbs.setValue(4)
-        self.limbs.setMaximum(10)
-        self.OKbutton = QtGui.QPushButton("Load all limbs")
-        self.CANCELbutton = QtGui.QPushButton("Cancel")
-        # Set dialog layout
-        layout = QtGui.QVBoxLayout()
-        layout.addWidget (self.addWidgetsInHBox([text1, self.limbs]))
-        layout.addWidget(self.tabWidget)
-        layout.addWidget (self.addWidgetsInHBox([self.CANCELbutton, self.OKbutton]))
-
-        self.setLayout(layout)
-        self.OKbutton.clicked.connect(self.load)
-        self.CANCELbutton.clicked.connect(self.cancel)
-        self.limbs.valueChanged.connect(self.update)
-        self.update()
-    # methods
-
-    def update (self):
-        self.tabWidget.clear()
-        self.tabs = [0]*self.limbs.value
-        for i in range(0,self.limbs.value):
-            self.tabs[i] = _LimbTab (self,self)
-            self.tabWidget.addTab(self.tabs[i], "limb" + str(i+1) )
-            if i == 1:
-                self.tabs[i].legId.setText("lhleg")
-                self.tabs[i].leg.setText("lh_haa_joint")
-                self.tabs[i].foot.setText("lh_foot_joint")
-                self.tabs[i].offset.setText("0,0.021,0")
-                self.tabs[i].normal.setText("0,-1,0")
-            if i == 2:
-                self.tabs[i].legId.setText("rhleg")
-                self.tabs[i].leg.setText("rh_haa_joint")
-                self.tabs[i].foot.setText("rh_foot_joint")
-            if i == 3:
-                self.tabs[i].legId.setText("lfleg")
-                self.tabs[i].leg.setText("lf_haa_joint")
-                self.tabs[i].foot.setText("lf_foot_joint")
-                self.tabs[i].offset.setText("0,0.021,0")
-                self.tabs[i].normal.setText("0,-1,0")
-
-    
-    def load (self):
-            self.accept()
-    def cancel (self):
-            self.reject()
-    def hideWidget (self,widget, button):
-        if button.isChecked():
-            widget.setHidden(False)
-        else:
-            widget.setHidden(True)
-
-    def addWidgetsInHBox(self, widgets):
-        nameParentW = QtGui.QWidget(self)
-        hboxName = QtGui.QHBoxLayout(nameParentW)
-        for w in widgets:
-            hboxName.addWidget(w)
-        return nameParentW
-
-    def bindFunctionToButton (self, buttonLabel, func):
-        button = QtGui.QPushButton(self)
-        button.text = buttonLabel
-        button.connect ('clicked()', func)
-        return button
-
 
 class _EnvDialog(QtGui.QDialog):
     def __init__(self, parent=None):
@@ -950,45 +876,53 @@ class _EnvDialog(QtGui.QDialog):
         label = QtGui.QLabel("Choose predefined model or provide custom description.")
         self.model = QtGui.QComboBox()
         self.model.editable = False
+        self.model.addItem("")
+        for info in self.infos:
+            self.model.addItem(info[0]) 
         text1 = QtGui.QLabel('Choose predefined model')
-        text2 = QtGui.QLabel('Model name')
-        self.Envname = QtGui.QLineEdit("planning")
-        self.button = QtGui.QPushButton("Details")
-        self.button.setCheckable(True)
+        self.text2 = QtGui.QLabel('Model name')
+        self.Envname = QtGui.QLineEdit()
+        self.tick = QtGui.QCheckBox("Details")
 
         # add widgets to grid
         self.grid.addWidget (label, 0,0,1,2)
         self.grid.addWidget (text1, 1,0)
         self.grid.addWidget (self.model, 1,1)
-        self.grid.addWidget (text2,2,0,2,1)
+        self.grid.addWidget (self.text2,2,0,2,1)
         self.grid.addWidget (self.Envname, 2,1,2,1)
-        self.grid.addWidget (self.button, 4,1,1,1)
+        self.grid.addWidget (self.tick, 4,1,1,1)
         # create grid 2 and its widgets
         self.groupbox = QtGui.QGroupBox()
         self.grid2 = QtGui.QGridLayout(self.groupbox)
         self.grid2.setSpacing(10)
         envText3 = QtGui.QLabel('Package name')
-        self.pkgName = QtGui.QLineEdit("hpp-rbprm-corba")
-        envText4 = QtGui.QLabel('Mesh package name')
+        self.pkgName = QtGui.QLineEdit()
+        self.envText4 = QtGui.QLabel('Mesh package name')
         self.mpkgName = QtGui.QLineEdit()
         envText5 = QtGui.QLabel('URDF filename')
-        self.urdfName = QtGui.QLineEdit("darpa")
-        envText7 = QtGui.QLabel('URDF suffix')
+        self.urdfName = QtGui.QLineEdit()
+        self.envText7 = QtGui.QLabel('URDF suffix')
         self.urdfSuf = QtGui.QLineEdit()
-        envText8 = QtGui.QLabel('SRDF suffix')
+        self.envText8 = QtGui.QLabel('SRDF suffix')
         self.srdfSuf = QtGui.QLineEdit()
+        self.urdfSuf.setHidden(True)
+        self.srdfSuf.setHidden(True)
+        self.mpkgName.setHidden(True)
+        self.envText4.setHidden(True)
+        self.envText7.setHidden(True)
+        self.envText8.setHidden(True)
 
         # add widgets to grid2
         self.grid2.addWidget (label, 0,0)    
         self.grid2.addWidget (envText3, 1,0)
         self.grid2.addWidget (self.pkgName, 1,2)     
-        self.grid2.addWidget (envText4, 2,0)
+        self.grid2.addWidget (self.envText4, 2,0)
         self.grid2.addWidget (self.mpkgName, 2,2)     
         self.grid2.addWidget (envText5, 3,0)
         self.grid2.addWidget (self.urdfName, 3,2)      
-        self.grid2.addWidget (envText7, 5,0)
+        self.grid2.addWidget (self.envText7, 5,0)
         self.grid2.addWidget (self.urdfSuf, 5,2)
-        self.grid2.addWidget (envText8, 6,0)
+        self.grid2.addWidget (self.envText8, 6,0)
         self.grid2.addWidget (self.srdfSuf, 6,2)
        
         self.OKbutton = QtGui.QPushButton("Load")
@@ -1001,61 +935,160 @@ class _EnvDialog(QtGui.QDialog):
         # Set dialog layout
         self.setLayout(self.grid)
         # Add button signal to showDetails slot
-        self.button.clicked.connect(lambda: self.hideWidget(self.groupbox, self.button))
         self.OKbutton.clicked.connect(self.load)
         self.CANCELbutton.clicked.connect(self.cancel)
+        self.model.currentIndexChanged.connect(self.setValues)
+        self.tick.stateChanged.connect(lambda: self.hideWidget(self.groupbox, self.tick))
+        self.tick.setCheckState(QtCore.Qt.Checked)
+
     # methods
     def load (self):
             self.accept()
     def cancel (self):
             self.reject()
-    def hideWidget (self,widget, button):
-        if button.isChecked():
+
+    def hideWidget (self,widget, tick):
+        if tick.checkState() == QtCore.Qt.Checked:
             widget.setHidden(False)
         else:
             widget.setHidden(True)
-
+    
     def read(self):
         return self.settings.readEnvironments()
+
+    def setValues(self):
+        model = self.model.currentText
+        self.Envname.setText("")
+        self.pkgName.setText("")
+        self.mpkgName.setText("")
+        self.urdfName.setText("")
+        self.urdfSuf.setText("")
+        self.srdfSuf.setText("")
+        for info in self.infos:
+            if (info[0] == model):
+                self.setInfo(info)
+                break
+
+    def setInfo (self, info):
+        self.Envname.setText(info[0])
+        self.pkgName.setText(info[1])
+        self.urdfName.setText(info[2])
         
 class _RobotDialog(_EnvDialog):
     def __init__(self, parent=None):
         super(_RobotDialog, self).__init__(parent)
         #self.grid2.removeWidget(self.envText6)
         #self.grid2.removeWidget(self.urdfromName)
-        self.infos = self.settings.readRobots()
         text = QtGui.QLabel('Root-joint type')
         self.rootJoint = QtGui.QComboBox()
         self.rootJoint.addItem("freeflyer")
         self.rootJoint.addItem("planar")
         self.rootJoint.addItem("anchor")
         self.grid.addWidget(text,3,0,1,1)
-        self.grid.addWidget(self.rootJoint,3,1,2,1)
+        self.grid.addWidget(self.rootJoint,3,1,1,1)
         self.envText6 = QtGui.QLabel('URDF ROM names, separated by commas')
-        self.urdfromName = QtGui.QLineEdit("hyq_rhleg_rom, hyq_lfleg_rom, hyq_rfleg_rom, hyq_lhleg_rom")
+        self.urdfromName = QtGui.QLineEdit("")
         self.grid2.addWidget (self.envText6, 4,0)
         self.grid2.addWidget (self.urdfromName, 4,2)
-        self.Envname.setText("hyq_trunk_large")
-        self.urdfName.setText("hyq_trunk_large")
-        self.pkgName.setText("hpp-rbprm-corba")
-        self.mpkgName.setText("hpp-rbprm-corba")
+        self.Envname.setHidden(True)
+        self.text2.setHidden(True)
+        self.urdfSuf.setHidden(False)
+        self.srdfSuf.setHidden(False)
+        self.mpkgName.setHidden(False)
+        self.envText4.setHidden(False)
+        self.envText7.setHidden(False)
+        self.envText8.setHidden(False)
+
 
     def read(self):
         return self.settings.readRobots()
 
-class _FullBodyDialog (_RobotDialog):
-     def __init__(self, parent=None):
-        super(_FullBodyDialog, self).__init__(parent)
+    def setInfo (self, info):
+        self.Envname.setText(info[0])
+        self.pkgName.setText(info[5])
+        self.mpkgName.setText(info[4])
+        self.urdfName.setText(info[1])
+        roms = ""
+        for rom in info[2]:
+            roms = roms + rom + ','
+        self.urdfromName.setText(roms[:-1])
+        idx = self.rootJoint.findText(info[3])
+        if idx >= 0:
+            self.rootJoint.setCurrentIndex(idx)
+        self.urdfSuf.setText(info[6])
+        self.srdfSuf.setText(info[7])
 
-        self.Envname.setText("hyq")
-        self.urdfName.setText("hyq")
-        self.pkgName.setText("hyq_description")
-        self.mpkgName.setText("hyq_description")
+class _FullBodyDialog (_RobotDialog):
+    def __init__(self, parent=None):
+        super(_FullBodyDialog, self).__init__(parent)
+        self.setGeometry(440,418, 800, 450)
+        self.limbInfos = []
+        self.Envname.setText("")
+        self.urdfName.setText("")
+        self.pkgName.setText("")
+        self.mpkgName.setText("")
         self.envText6.setHidden(True)
         self.urdfromName.setHidden(True)
 
-        def read(self):
-            return self.settings.readFullbodies()
+        self.tabWidget = QtGui.QTabWidget()
+        self.tabs = [0]*4
+        text1 = QtGui.QLabel("Number of limbs")
+        self.limbs = QtGui.QSpinBox()
+        self.limbs.setValue(1)
+        self.limbs.setMaximum(10)
+        
+        self.limbs.valueChanged.connect(self.update)
+        self.grid.addWidget (text1, 0,3,1,2)
+        self.grid.addWidget (self.limbs, 0,5,1,2)
+        self.grid.addWidget(self.tabWidget, 1,3,8,4)
+        self.update()
+
+    def update (self):
+        self.tabWidget.clear()
+        self.tabs = [0]*self.limbs.value
+        for i in range(len(self.tabs)):
+            self.tabs[i] = _LimbTab (self,self)
+            self.tabWidget.addTab(self.tabs[i], "limb" + str(i+1))
+            if (i < len(self.limbInfos)):
+                self.tabs[i].nbSamples.setValue(self.limbInfos[i][0])
+                idx = self.tabs[i].cType.findText(self.limbInfos[i][1])
+                self.tabs[i].cType.setCurrentIndex(idx)
+                self.tabs[i].legxlegy.setText(str(self.limbInfos[i][2][0]) +','+ str(self.limbInfos[i][2][1]))
+                self.tabs[i].res.setValue (self.limbInfos[i][3])
+                self.tabs[i].legId.setText(self.limbInfos[i][4])
+                self.tabs[i].leg.setText(self.limbInfos[i][5])
+                self.tabs[i].foot.setText(self.limbInfos[i][6])
+                idx = self.tabs[i].heur.findText(self.limbInfos[i][7])
+                self.tabs[i].heur.setCurrentIndex(idx)
+                self.tabs[i].normal.setText(str(self.limbInfos[i][8][0])+','+\
+                        str(self.limbInfos[i][8][1])+','+str(self.limbInfos[i][8][2]))
+                self.tabs[i].offset.setText(str(self.limbInfos[i][9][0])+','+\
+                        str(self.limbInfos[i][9][1])+','+str(self.limbInfos[i][9][2]))
+                if self.limbInfos[i][10]:
+                    self.tabs[i].disable.setCheckState(QtCore.Qt.Checked)
+
+    def read(self):
+        return self.settings.readFullbodies()
+
+    def setValues(self):
+        self.limbInfos = []
+        self.tabs = []
+        self.limbs.setValue(1)
+        super (_FullBodyDialog, self).setValues()
+
+    def setInfo (self, info):
+        self.Envname.setText(info[0])
+        self.urdfName.setText(info[1])
+        idx = self.rootJoint.findText(info[2])
+        if idx >= 0:
+            self.rootJoint.setCurrentIndex(idx)
+        self.pkgName.setText(info[3])
+        self.mpkgName.setText(info[4])
+        self.urdfSuf.setText(info[5])
+        self.srdfSuf.setText(info[6])
+        self.limbInfos = info[7]
+        self.limbs.setValue(len(self.limbInfos))
+        
 
 class _AffDialog(QtGui.QDialog):
     def __init__(self, plugin, parent=None):
@@ -1179,14 +1212,12 @@ class _RbprmInterp (QtGui.QWidget):
         vbox1.addWidget(self.addWidgetsInHBox([self.bindFunctionToButton("Solve", self.solve),\
                 self.solveStatus, self.bindFunctionToButton("Interrupt", self.interruptPathPlanning)]))
 
-        self.space = QtGui.QLabel("")
         self.computeStatus = QtGui.QLabel()
         self.computeStatus.setAlignment(QtCore.Qt.AlignCenter)
         self.computeStatus.setStyleSheet("background-color: blue")
-        vbox1.addWidget(self.addWidgetsInHBox([self.bindFunctionToButton("Load full-body model",\
-                self.Fullbody), self.bindFunctionToButton("Load limb models", self.Limb)]))
-        vbox1.addWidget(self.addWidgetsInHBox([self.bindFunctionToButton("Compute contacts",\
-                self.computeContacts), self.computeStatus, self.space]))
+        vbox1.addWidget(self.addWidgetsInHBox([self.bindFunctionToButton("Load fullbody",\
+                self.Fullbody), self.bindFunctionToButton("Compute contacts",\
+                self.computeContacts), self.computeStatus]))
         self.slider = QtGui.QSlider(QtCore.Qt.Horizontal)
         self.slider.setMinimum(0)
         self.slider.setMaximum(100)
@@ -1280,7 +1311,7 @@ class _RbprmInterp (QtGui.QWidget):
         self.fbdialog = _FullBodyDialog()
         if self.fbdialog.exec_():
             info = []
-            info.append (str(self.fbdialog.Envname.text))
+          #  info.append (str(self.fbdialog.Envname.text))
             info.append (str(self.fbdialog.urdfName.text))
             info.append (str(self.fbdialog.rootJoint.currentText))
             info.append (str(self.fbdialog.mpkgName.text))
@@ -1288,52 +1319,47 @@ class _RbprmInterp (QtGui.QWidget):
             info.append (str(self.fbdialog.urdfSuf.text))
             info.append (str(self.fbdialog.srdfSuf.text))
             self.latestFullbodyInfo = info
-            t = Thread(target=self.loadFullbody, args=(self, info))
+            if (info[0] == "" or info[2] == "" or info[3] == ""):
+                print ("Please make sure you have provided a full description of the robot.")
+                return
+            tabs = self.fbdialog.tabs
+            limbInfos = []
+            self.legIds = []
+            for tab in tabs:
+                limbInfo = []
+                limbInfo.append (str(tab.legId.text))
+                self.legIds.append(limbInfo[0])     
+                limbInfo.append (str(tab.leg.text))
+                limbInfo.append (str(tab.foot.text))
+                limbInfo.append (self.str2float(str(tab.offset.text)))
+                limbInfo.append (self.str2float(str(tab.normal.text)))
+                limbInfo.append (self.str2float(str(tab.legxlegy.text)))
+                limbInfo.append (int(tab.nbSamples.value))
+                limbInfo.append (str(tab.heur.currentText))
+                limbInfo.append (float(tab.res.value))
+                limbInfo.append (str(tab.cType.currentText))
+                if tab.disable.checkState () == QtCore.Qt.Checked:
+                    limbInfo.append(True)
+                else:
+                    limbInfo.append(False)
+                limbInfos.append(limbInfo)
+            self.latesLimbInfos = limbInfos
+            t = Thread(target=self.loadFullbody, args=(self, info, limbInfos))
             t.start()
             while t.is_alive():
                 QtCore.QCoreApplication.processEvents()
                 time.sleep(0.2)
             self.addToViewer()
+            self.plugin.r(self.plugin.fullbody.getCurrentConfig())
             self.plugin.client.gui.setVisibility(self.plugin.builder.name, "OFF")
             self.update()
 
-    def loadFullbody (self, tab, info):
-        tab.plugin.fullbody.loadFullBodyModel (info[1],info[2],info[3],\
-                info[4], info[5],info[6])
-
-    def Limb (self):
-        self.limbdialog = _LimbDialog()
-        if self.limbdialog.exec_():
-            tabs = self.limbdialog.tabs
-            infos = []
-            self.legIds = []
-            for tab in tabs:
-                info = []
-                info.append (str(tab.legId.text))
-                self.legIds.append(info[0])     
-                info.append (str(tab.leg.text))
-                info.append (str(tab.foot.text))
-                info.append (self.str2float(str(tab.offset.text)))
-                info.append (self.str2float(str(tab.normal.text)))
-                info.append (self.str2float(str(tab.legxlegy.text)))
-                info.append (int(tab.nbSamples.value))
-                info.append (str(tab.heur.currentText))
-                info.append (float(tab.res.value))
-                info.append (str(tab.cType.currentText))
-                infos.append(info)
-                self.latesLimbInfos = infos
-            t = Thread(target=self.loadLimbs, args=(self, infos))
-            t.start()
-            while t.is_alive():
-                QtCore.QCoreApplication.processEvents()
-                time.sleep(0.2)
-            self.plugin.r(self.plugin.fullbody.getCurrentConfig())
-            self.update()
-
-    def loadLimbs(self, tab, infos):
-        for info in infos:
+    def loadFullbody (self, tab, info, limbInfos):
+        tab.plugin.fullbody.loadFullBodyModel (info[0],info[1],info[2],\
+                info[3], info[4],info[5])
+        for info in limbInfos:
             tab.plugin.fullbody.addLimb(info[0],info[1],info[2],info[3],info[4], info[5][0],\
-                    info[5][1], info[6], info[7], info[8], info[9])
+                    info[5][1], info[6], info[7], info[8], info[9], info[10])
 
     def computeContacts (self):
         self.resetStatus()
@@ -1585,9 +1611,6 @@ class Settings ():
                   break
         QtCore.QSettings.setPath (QtCore.QSettings.IniFormat, QtCore.QSettings.SystemScope, str(path))
         QtCore.QSettings.setPath (QtCore.QSettings.NativeFormat, QtCore.QSettings.SystemScope, str(path))
-        self.robots = []
-        self.envs = []
-        self.fullbodies = []
 
     def readRobots(self):
         # second argument is directory name as follows: path/[gepetto-gui]/[rbprmRobots].conf
@@ -1599,20 +1622,25 @@ class Settings ():
             print ("Error occurred when opening rbprm-robot config file.")
             return
         else:
-            for child in robot.childGroups():
+            infos = []
+            for child in robot.childGroups():           
                 info = []
-                info.append (str(robot.value("RobotName", child)))
+                robot.beginGroup(child)
+                info.append (child)
                 info.append (str(robot.value("ModelName", "")))
-                urdfROMs = str(robot.value("URDFRomNames", ""))
-                urdfROMs = urdfROMs.replace(" ", "")
-                info.append (urdfROMs.split(','))
+                urdfROMs = robot.value("URDFRomNames", "")
+                strROMs = []
+                for rom in urdfROMs:
+                    strROMs.append(str(rom))
+                info.append (strROMs)
                 info.append (str(robot.value("RootJointType", "freeflyer")))
                 info.append (str(robot.value("MeshPackage", "")))
                 info.append (str(robot.value("Package", "")))
                 info.append (str(robot.value("URDFSuffix", "")))
                 info.append (str(robot.value("SRDFSuffix", "")))
-                self.robots.append(info)
-                print ("going through elements", info)
+                infos.append(info)
+                robot.endGroup()
+            return infos
                 
     def readEnvironments(self):
         env = QtCore.QSettings (QtCore.QSettings.SystemScope,"gepetto-gui", "rbprmEnvironments")
@@ -1620,27 +1648,69 @@ class Settings ():
             print ("Error occurred when opening rbprm-environment config file.")
             return
         else:
+            infos = []
             for child in env.childGroups():
                 info = []
+                env.beginGroup(str(child))
+                info.append (str(env.value("RobotName", child)))
                 info.append (str(env.value("Package","")))
                 info.append (str(env.value("URDFFilename", "")))
-                info.append (str(env.value("RobotName", child)))
-                self.envs.append(info)
+                infos.append(info)
+                env.endGroup()
+            return infos
 
-    def readFullbody (self):
+    def readFullbodies (self):
         fb = QtCore.QSettings (QtCore.QSettings.SystemScope,"gepetto-gui", "rbprmFullbodies")
         if (fb.status () != QtCore.QSettings.NoError):
             print ("Error occurred when opening rbprm-environment config file.")
             return
         else:
+            infos = []
             for child in fb.childGroups():
             #TODO: FINISH!
                 info = []
-                info.append (str(fb.value("Package","")))
-                info.append (str(fb.value("URDFFilename", "")))
-                info.append (str(fb.value("RobotName", child)))
-                self.envs.append(info)
+                fb.beginGroup(child)
+                info.append (str(child))
+                info.append (str(fb.value("ModelName", "")))
+                info.append (str(fb.value("RootJointType", "freeflyer")))
+                info.append (str(fb.value("MeshPackage", "")))
+                info.append (str(fb.value("Package", "")))
+                info.append (str(fb.value("URDFSuffix", "")))
+                info.append (str(fb.value("SRDFSuffix", "")))
+                nbSamples = fb.value("nbSamples")
+                cTypes = fb.value("cType")
+                legxy = fb.value("LegXY")
+                res = fb.value("Resolution")
+                legIds = fb.value("LegIds", "")
+                firstJoints = fb.value("FirstJoints","")
+                lastJoints = fb.value("LastJoints", "")
+                heuristics = fb.value("Heuristics", "")
+                normals = fb.value("Normals")
+                offsets = fb.value("Offsets")
+                disable = fb.value("DisableEffectorCollision")
+                nbLegs = len(legIds)
+                limbInfos = []
+                for i in range(nbLegs):
+                    limbInfo = []
+                    limbInfo.append(int(nbSamples[i]))
+                    limbInfo.append (str(cTypes[i]))
+                    limbInfo.append ([float(legxy[2*i]),float(legxy[2*i +1])])
+                    limbInfo.append (float(res[i]))
+                    limbInfo.append(str(legIds[i]))
+                    limbInfo.append(str(firstJoints[i]))
+                    limbInfo.append(str(lastJoints[i]))
+                    limbInfo.append(str(heuristics[i]))
+                    limbInfo.append([float(normals[3*i]), float(normals[3*i +1]), float(normals[3*i +2])])
+                    limbInfo.append([float(offsets[3*i]), float(offsets[3*i +1]), float(offsets[3*i +2])])
+                    limbInfo.append(bool(int(disable[i])))
+                    limbInfos.append(limbInfo)
+                info.append(limbInfos)
+                infos.append(info)
+                print (info)
+                fb.endGroup()
+            return infos
 
+        #    ('list_value', type=float)
 
 
 
