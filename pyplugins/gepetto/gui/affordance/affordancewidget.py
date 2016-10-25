@@ -1358,6 +1358,7 @@ class _RbprmInterp (QtGui.QWidget):
         tab.plugin.fullbody.loadFullBodyModel (info[0],info[1],info[2],\
                 info[3], info[4],info[5])
         for info in limbInfos:
+            print (info)
             tab.plugin.fullbody.addLimb(info[0],info[1],info[2],info[3],info[4], info[5][0],\
                     info[5][1], info[6], info[7], info[8], info[9], info[10])
 

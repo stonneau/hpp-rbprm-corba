@@ -18,3 +18,14 @@
 FINDPYTHON()
 PYTHON_INSTALL_ON_SITE (gepetto/gui/affordance/ affordancewidget.py)
 PYTHON_INSTALL_ON_SITE (gepetto/gui/affordance/ __init__.py)
+SET (RBPRM_CONFIG
+    gepetto/gui/affordance/rbprmEnvironments.conf
+    gepetto/gui/affordance/rbprmRoms.conf
+    gepetto/gui/affordance/rbprmFullbodies.conf
+    )
+
+install (FILES
+    ${RBPRM_CONFIG}
+    DESTINATION ${CMAKE_INSTALL_PREFIX}/etc/gepetto-gui)
+
+
