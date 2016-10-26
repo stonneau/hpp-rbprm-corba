@@ -10,6 +10,19 @@ from hpp.gepetto import Viewer
 import math
 import time
 from threading import Thread
+#------------------------------------------------------------------------------------------start global functions
+def showdialog(warning):
+    msg = QtGui.QMessageBox()
+    msg.setIcon(QtGui.QMessageBox.Warning)
+
+    msg.setText(warning)
+    #msg.setInformativeText("This is additional information")
+    msg.setWindowTitle("Rbrpm warning")
+    #msg.setDetailedText("The details are as follows:")
+    msg.setStandardButtons(QtGui.QMessageBox.Ok | QtGui.QMessageBox.Cancel)
+    #msg.buttonClicked.connect(msgbtn)
+    msg.exec_()
+    #print "value of pressed message box button:", retval
 
 def magnitude(v):
     return math.sqrt(sum(v[i]*v[i] for i in range(len(v))))
@@ -39,7 +52,8 @@ def equal (v1, v2):
     else:
         res = False
     return res
-
+#------------------------------------------------------------------------------------------end  global functions
+#------------------------------------------------------------------------------------------start _RbprmPath
 ### This class represents one special tab of the new QDockWidget
 class _RbprmPath (QtGui.QWidget):
     def __init__(self, parent, plugin):
@@ -260,7 +274,8 @@ class _RbprmPath (QtGui.QWidget):
             info.append (str(self.robotdialog.urdfSuf.text))
             info.append (str(self.robotdialog.srdfSuf.text))
             if (info[1] == "" or info[2] == "" or info[4] == "" or info[5] == ""):
-                print ("Please make sure you have provided a full description of the robot.")
+                msg = "Please make sure you have provided a full description of the robot."
+                showdialog(msg)
                 return
             self.latestRobotInfo = info
             #self.plugin.builder = Builder ()
@@ -296,7 +311,8 @@ class _RbprmPath (QtGui.QWidget):
                     time.sleep(0.2)
             self.update()
         else:
-            print ("Please load ROM robot before environment.")
+            msg = "Please load ROM robot before environment."
+            showdialog(msg)
 
     def loadEnvironment (self, viewer, info):
         viewer.loadObstacleModel (info[0],info[1],info[2])
@@ -322,11 +338,8 @@ class _RbprmPath (QtGui.QWidget):
                         self.plugin.builder.boundSO3(quatbounds)
                         self.plugin.SO3bounds = quatbounds
         else:
-            print ("Please add ROM robot before setting bounds")
-
-    
-
-
+            msg = "Please add ROM robot before setting bounds"
+            showdialog(msg)
 
     def Affordance (self):
         self.affdialog = _AffDialog(self.plugin)
@@ -378,7 +391,6 @@ class _RbprmPath (QtGui.QWidget):
             configSize = self.plugin.basicClient.robot.getJointConfigSize(joint)
             if configSize < 5:
                 config[idx] = self.jointConfig[idx].value
-        #    print ("got here", joint, config, configSize)
             self.plugin.basicClient.robot.setJointConfig(joint, config)
             conf = self.plugin.basicClient.robot.getCurrentConfig()
             self.plugin.r(conf)
@@ -390,6 +402,10 @@ class _RbprmPath (QtGui.QWidget):
                     self.validator.setStyleSheet("background-color: red")
 
     def addConfig (self):
+        if hasattr (self.plugin.builder, 'name') == False:
+            msg = "Please add robot model before setting configurations."
+            showdialog(msg)
+            return
         conf = self.plugin.builder.getCurrentConfig()
         if str(self.configCombo.currentText) == 'initial':
             self.plugin.basicClient.problem.setInitialConfig(conf)
@@ -403,6 +419,10 @@ class _RbprmPath (QtGui.QWidget):
         self.update ()
 
     def clearConfigs (self):
+        if hasattr (self.plugin.builder, 'name') == False:
+            msg = "Please add robot model before clearing configurations."
+            showdialog(msg)
+            return
         if str(self.configCombo.currentText) == 'initial':
             configSize = self.plugin.basicClient.robot.getConfigSize()
             conf = [0]*configSize
@@ -453,6 +473,10 @@ class _RbprmPath (QtGui.QWidget):
         self.refreshBodyTree()
 
     def affordanceAnalysis (self):
+        if hasattr (self.plugin.builder, 'name') == False:
+            msg = "Please add robot and environment models before searching for affordance objects."
+            showdialog(msg)
+            return
         objectname = str(self.affAnalysisObjects.currentText)
         self.lastObject = objectname
         affType = str(self.affAnalysisOptions.currentText)
@@ -1038,8 +1062,8 @@ class _FullBodyDialog (_RobotDialog):
         self.limbs.setMaximum(10)
         
         self.limbs.valueChanged.connect(self.update)
-        self.grid.addWidget (text1, 0,3,1,2)
-        self.grid.addWidget (self.limbs, 0,5,1,2)
+        self.grid.addWidget (text1, 0,5)
+        self.grid.addWidget (self.limbs, 0,6)
         self.grid.addWidget(self.tabWidget, 1,3,8,4)
         self.update()
 
@@ -1232,6 +1256,8 @@ class _RbprmInterp (QtGui.QWidget):
         self.pause.setIcon(self.style().standardIcon(QtGui.QStyle.SP_MediaPause))
         vbox1.addWidget(self.addWidgetsInHBox([self.play, self.stop, self.pause, self.slider]))
         self.play.setDisabled(True)
+        self.stop.setDisabled(True)
+        self.pause.setDisabled(True)
 
         self.play.clicked.connect(self.playConfigs)
         self.stop.clicked.connect(self.stopPlayer)
@@ -1320,7 +1346,8 @@ class _RbprmInterp (QtGui.QWidget):
             info.append (str(self.fbdialog.srdfSuf.text))
             self.latestFullbodyInfo = info
             if (info[0] == "" or info[2] == "" or info[3] == ""):
-                print ("Please make sure you have provided a full description of the robot.")
+                msg = "Please make sure you have provided a full description of the robot."
+                showdialog(msg)
                 return
             tabs = self.fbdialog.tabs
             limbInfos = []
@@ -1349,6 +1376,9 @@ class _RbprmInterp (QtGui.QWidget):
             while t.is_alive():
                 QtCore.QCoreApplication.processEvents()
                 time.sleep(0.2)
+            if (self.plugin.viewCreated == False):
+                self.plugin.main.createView("window_hpp_") #TODO: find way of adding view of custom name
+                self.plugin.viewCreated = True
             self.addToViewer()
             self.plugin.r(self.plugin.fullbody.getCurrentConfig())
             self.plugin.client.gui.setVisibility(self.plugin.builder.name, "OFF")
@@ -1358,18 +1388,19 @@ class _RbprmInterp (QtGui.QWidget):
         tab.plugin.fullbody.loadFullBodyModel (info[0],info[1],info[2],\
                 info[3], info[4],info[5])
         for info in limbInfos:
-            print (info)
             tab.plugin.fullbody.addLimb(info[0],info[1],info[2],info[3],info[4], info[5][0],\
                     info[5][1], info[6], info[7], info[8], info[9], info[10])
 
     def computeContacts (self):
         self.resetStatus()
         if self.plugin.rbprmPath.initConfigSet == False:
-            print ("Please set initial configuration and solve before computing contacts.")
+            msg = "Please set initial configuration and solve before computing contacts."
+            showdialog(msg)
         else:
             goals = self.plugin.basicClient.problem.getGoalConfigs()
             if (len (goals)) < 1:
-                print ("Please add goal configurationand solve before computing contacts.")
+                msg = "Please add goal configurationand solve before computing contacts."
+                showdialog(msg)
             else:
                 #TODO check that init & goal not the same as this leads to segmentation fault
                 self.computeStatus.setText("Computing")
@@ -1384,6 +1415,8 @@ class _RbprmInterp (QtGui.QWidget):
                 self.computeStatus.setText("Done")
                 self.computeStatus.setStyleSheet("background-color: green")
                 self.play.setDisabled(False)
+                self.stop.setDisabled(False)
+                self.pause.setDisabled(False)
                 self.update()
 
     def contacts (self, tab, q_i, q_g):
@@ -1475,16 +1508,19 @@ class _RbprmInterp (QtGui.QWidget):
     def solve (self):
         self.resetStatus()
         if self.plugin.rbprmPath.initConfigSet == False:
-            print ("Please set initial configuration before solving.")
+            msg = "Please set initial configuration before solving."
+            showdialog(msg)
         else:
             goals = self.plugin.basicClient.problem.getGoalConfigs()
             if (len (goals)) < 1:
-                print ("Please add goal configuration before solving.")
+                msg = "Please add goal configuration before solving."
+                showdialog(msg)
             else:
                 init = self.plugin.basicClient.problem.getInitialConfig()
                 for i in range (len(goals)):
                     if equal(init, goals[i]):
-                        print ("Initial and goal configuration should not be equal.")
+                        msg = "Initial and goal configuration should not be equal."
+                        showdialog(msg)
                         return
                 self.solveStatus.setText("Solving")
                 self.solveStatus.setStyleSheet("background-color: yellow")
@@ -1558,7 +1594,6 @@ class Plugin(QtGui.QDockWidget):
         #label = QtGui.QLabel("t")
         #label.mouseMoveEvent = self.mouseMoveEvent
         #osgWindow.mouseMoveEvent = self.mouseMoveEvent #(QtCore.QEvent.MouseMove)',self.mouseMove)
-        
         #osgWindow.cursor.pos()connect('')
 
     def resetConnection(self):
@@ -1583,17 +1618,13 @@ class Plugin(QtGui.QDockWidget):
             print ("moved mouse")
 
     def eventFilter(self, source, event):
-        if (event.type() == QtCore.QEvent.MouseMove):# and
-            #source is self.osg):
-            print('mouse at:', event.x(), event.y())
-        #    print ("osg mouse:", source.)
+        if (event.type() == QtCore.QEvent.MouseMove):
+            #print('mouse at:', event.x(), event.y())
             return False
         return QtGui.QWidget.eventFilter(self, source, event)
 
     def selected(self, name, posInWorldFrame):
         if (self.chooseWithMouse):
-         #   QtGui.QMessageBox.information(self, "Selected object", name + " " + str(posInWorldFrame))
-            #if str(name).find(self.builder.name) > -1:
             #    self.osg.cursor.setShape(QtCore.Qt.ClosedHandCursor)
             self.rbprmPath.spinConfig(self.rbprmPath.qvector2float (posInWorldFrame))
 #----------------------------------------------------------------------------------------- end plugin
@@ -1620,7 +1651,8 @@ class Settings ():
         #keys = robot.allKeys()
         #print (keys)
         if (robot.status () != QtCore.QSettings.NoError):
-            print ("Error occurred when opening rbprm-robot config file.")
+            msg = "Error occurred when opening rbprm-robot config file."
+            showdialog(msg)
             return
         else:
             infos = []
@@ -1646,7 +1678,8 @@ class Settings ():
     def readEnvironments(self):
         env = QtCore.QSettings (QtCore.QSettings.SystemScope,"gepetto-gui", "rbprmEnvironments")
         if (env.status () != QtCore.QSettings.NoError):
-            print ("Error occurred when opening rbprm-environment config file.")
+            msg = "Error occurred when opening rbprm-environment config file."
+            showdialog(msg)
             return
         else:
             infos = []
@@ -1663,7 +1696,8 @@ class Settings ():
     def readFullbodies (self):
         fb = QtCore.QSettings (QtCore.QSettings.SystemScope,"gepetto-gui", "rbprmFullbodies")
         if (fb.status () != QtCore.QSettings.NoError):
-            print ("Error occurred when opening rbprm-environment config file.")
+            msg = "Error occurred when opening rbprm-environment config file."
+            showdialog(msg)
             return
         else:
             infos = []
@@ -1707,11 +1741,7 @@ class Settings ():
                     limbInfos.append(limbInfo)
                 info.append(limbInfos)
                 infos.append(info)
-                print (info)
                 fb.endGroup()
             return infos
-
-        #    ('list_value', type=float)
-
-
+#------------------------------------------------------------------------------------------end settings
 
