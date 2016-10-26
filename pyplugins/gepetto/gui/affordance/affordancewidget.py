@@ -477,17 +477,15 @@ class _RbprmPath (QtGui.QWidget):
             msg = "Please add robot and environment models before searching for affordance objects."
             showdialog(msg)
             return
-        objectname = str(self.affAnalysisObjects.currentText)
-        self.lastObject = objectname
+        objectname = [str(self.affAnalysisObjects.currentText),]
+        self.lastObject = objectname[0]
         affType = str(self.affAnalysisOptions.currentText)
         self.lastAff = affType
-        if objectname == "All objects":
-            objectname = ""
-         #   self.plugin.affClient.affordance.analyseAll ()
-            t = Thread(target=self.analyseAll)
-        else:
-            t = Thread(target=self.analyseObject, args=(objectname,))
-         #   self.plugin.affClient.affordance.analyseObject (objectname)
+        if objectname[0] == "All objects":
+            allItems = [str(self.affAnalysisObjects.itemText(i)) for i in range(self.affAnalysisObjects.count)]
+            if objectname[0] in allItems: allItems.remove(objectname[0])
+            objectname = allItems
+        t = Thread(target=self.analyse, args=(objectname,))
         t.start()
         while t.is_alive():
             QtCore.QCoreApplication.processEvents()
@@ -501,11 +499,12 @@ class _RbprmPath (QtGui.QWidget):
         self.analysed = True
         self.update ()
 
-    def analyseAll (self):
-        self.plugin.affClient.affordance.analyseAll ()
-
-    def analyseObject (self, objectname):
-        self.plugin.affClient.affordance.analyseObject (objectname)
+    def analyse (self, allNames):
+        for name in allNames:
+            if self.plugin.affClient.affordance.checkModel(name):
+                self.plugin.affClient.affordance.analyseObject (name)
+            else:
+                print ("Object ",name, " has wrong model type. Affordance analysis cannot be run on the object.")           
 
     def getAffordancePoints (self, affordanceType):
         return self.plugin.affClient.affordance.getAffordancePoints (affordanceType)
@@ -538,34 +537,35 @@ class _RbprmPath (QtGui.QWidget):
             self.plugin.client.gui.removeFromGroup(groupNode, "hpp-gui")
             self.plugin.client.gui.addToGroup(groupNode, "hpp-gui")
 
-    def visualiseAffordances (self, affType, colour, obstacleName=""):
+    def visualiseAffordances (self, affType, colour, obstacleNames=[]):
         if len(colour) < 4 : # if the colour is only rgb we suppose alpha = 1 
           colour = colour + [1]
-        if obstacleName == "":
+        if obstacleNames == []:
           return self.visualiseAllAffordances (affType, colour)
         else:
-          self.deleteAffordancesByTypeFromViewer (affType, obstacleName)
-          nodes = self.plugin.client.gui.getNodeList ()
-          if affType not in nodes: self.plugin.client.gui.createGroup (str (affType))
-          objs = self.getAffordancePoints (affType)
-          refs = self.getAffRefObstacles (affType)
-          for aff in objs:
-            if refs[objs.index (aff)] == obstacleName:
-              count = 0
-              for tri in aff:
-                name = str (affType) + '-' + \
-                str (refs[objs.index (aff)]) + '.' + \
-         str (objs.index (aff)) + '.' + str(count)
-                self.plugin.client.gui.addTriangleFace (name, \
-                    tri[0], tri[1], tri[2], [colour[0], colour[1], colour[2], colour[3]])
-                self.plugin.client.gui.addToGroup (name, str (affType))
-                count += 1
-          scenes = self.plugin.client.gui.getSceneList() #TODO: add check to see whether scenes is empty
-          groupNodes = self.plugin.client.gui.getGroupNodeList('hpp-gui')
-          self.plugin.client.gui.addToGroup (str (affType), 'hpp-gui')
-          for groupNode in groupNodes :
-              self.plugin.client.gui.removeFromGroup(groupNode,'hpp-gui')
-              self.plugin.client.gui.addToGroup(groupNode,'hpp-gui')
+          for obstacleName in obstacleNames:
+            self.deleteAffordancesByTypeFromViewer (affType, obstacleName)
+            nodes = self.plugin.client.gui.getNodeList ()
+            if affType not in nodes: self.plugin.client.gui.createGroup (str (affType))
+            objs = self.getAffordancePoints (affType)
+            refs = self.getAffRefObstacles (affType)
+            for aff in objs:
+              if refs[objs.index (aff)] == obstacleName:
+                count = 0
+                for tri in aff:
+                  name = str (affType) + '-' + \
+                  str (refs[objs.index (aff)]) + '.' + \
+                  str (objs.index (aff)) + '.' + str(count)
+                  self.plugin.client.gui.addTriangleFace (name, \
+                      tri[0], tri[1], tri[2], [colour[0], colour[1], colour[2], colour[3]])
+                  self.plugin.client.gui.addToGroup (name, str (affType))
+                  count += 1
+            scenes = self.plugin.client.gui.getSceneList() #TODO: add check to see whether scenes is empty
+            groupNodes = self.plugin.client.gui.getGroupNodeList('hpp-gui')
+            self.plugin.client.gui.addToGroup (str (affType), 'hpp-gui')
+            for groupNode in groupNodes :
+                self.plugin.client.gui.removeFromGroup(groupNode,'hpp-gui')
+                self.plugin.client.gui.addToGroup(groupNode,'hpp-gui')
 
     def deleteNode (self, nodeName, all):
         return self.plugin.client.gui.deleteNode (nodeName, all)
