@@ -1196,9 +1196,8 @@ class _RbprmInterp (QtGui.QWidget):
         self.paused = False
         self.stopped = False
         self.interrupted = False
-       # self.exampleThread = QtCore.QThread()
         vbox1 = QtGui.QVBoxLayout(self)
-        gridW = QtGui.QWidget()#(self)
+        gridW = QtGui.QWidget()
         grid = QtGui.QGridLayout(gridW)
         
         self.groupbox = QtGui.QGroupBox()
@@ -1494,7 +1493,17 @@ class _RbprmInterp (QtGui.QWidget):
         self.computeStatus.setStyleSheet("background-color: blue")
 
     def validateSettings (self):
-        self.plugin.basicClient.problem.addPathOptimizer (str(self.optimiserList.currentItem().text()))
+     #   if hasattr (self.plugin.builder, 'name') == False:
+     #       msg = "Please add rom robot model before setting solver options."
+     #       showdialog(msg)
+     #       return
+        if self.plugin.rbprmPath.analysed == False and str(self.validations.currentText) == "RbprmPathValidation":
+            msg = "You need to run the affordance search before adding rbprm path validators."
+            showdialog(msg)
+            return
+        opts = self.optimiserList.selectedItems()
+        for opt in opts:
+            self.plugin.basicClient.problem.addPathOptimizer (str(opt.text()))
         self.plugin.basicClient.problem.selectConFigurationShooter (str(self.shooters.currentText))
         self.plugin.basicClient.problem.selectPathValidation (str(self.validations.currentText),\
                 float(self.validationTolerance.value))
