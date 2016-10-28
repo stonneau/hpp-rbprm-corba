@@ -1182,6 +1182,50 @@ class _AffDialog(QtGui.QDialog):
     def cancel (self):
             self.reject()
 
+class _ContactDialog(QtGui.QDialog):
+    def __init__(self, plugin, parent=None):
+        super(_ContactDialog, self).__init__(parent)
+        self.plugin = plugin
+        self.grid = QtGui.QGridLayout()
+        self.grid.setSpacing(10)
+        self.setGeometry(440,418, 300, 300)
+        self.setWindowTitle('Contact interpolation settings')
+        self.spinBoxes = []
+        self.spinBoxes.append (QtGui.QSpinBox())
+        for i in range (2):
+            self.spinBoxes.append (QtGui.QDoubleSpinBox())
+            self.spinBoxes[i+1].setMinimum (0)
+        nbPaths = self.plugin.rbprmPath.ps.numberPaths()
+        if nbPaths > 0:
+            self.spinBoxes[0].setRange (0,nbPaths-1)
+        else:
+            self.spinBoxes[0].setDisabled(True)
+        self.spinBoxes[1].setSingleStep(0.01)
+        self.spinBoxes[2].setSingleStep(0.01)
+        label1 = QtGui.QLabel("Path:")
+        label2 = QtGui.QLabel("Timestep:")
+        label3 = QtGui.QLabel("Robustness:")
+        self.OKbutton = QtGui.QPushButton("Interpolate")
+        self.CANCELbutton = QtGui.QPushButton("Cancel")
+        self.grid.addWidget(label1,0,0)
+        self.grid.addWidget(self.spinBoxes[0], 0,1)
+        self.grid.addWidget(label2,1,0)
+        self.grid.addWidget(self.spinBoxes[1], 1,1)
+        self.grid.addWidget(label3,2,0)
+        self.grid.addWidget(self.spinBoxes[2], 2,1)
+        self.grid.addWidget (self.CANCELbutton, 3,0)
+        self.grid.addWidget (self.OKbutton, 3,1)
+        
+        # Set dialog layout
+        self.setLayout(self.grid)
+        self.OKbutton.clicked.connect(self.load)
+        self.CANCELbutton.clicked.connect(self.cancel)
+
+    def load (self):
+            self.accept()
+    def cancel (self):
+            self.reject()
+
 #------------------------------------------------------------------end _Dialogs
 
 #------------------------------------------------------------------start _AffCreator
@@ -1190,12 +1234,15 @@ class _RbprmInterp (QtGui.QWidget):
         super(_RbprmInterp, self).__init__ (parent)
         self.plugin = plugin
         self.plugin.SO3bounds = [1,0,1,0,1,0]
-        self.configs = []
+        self.allConfigs = [] # save all sequences into vector
+        self.configs = [] # current sequence
+        self.currentPath = 0 # current for player
         self.tolerance = -1
         self.startPoint = 0
         self.paused = False
         self.stopped = False
         self.interrupted = False
+        self.lastShow = ""
         vbox1 = QtGui.QVBoxLayout(self)
         gridW = QtGui.QWidget()
         grid = QtGui.QGridLayout(gridW)
@@ -1241,6 +1288,8 @@ class _RbprmInterp (QtGui.QWidget):
         vbox1.addWidget(self.addWidgetsInHBox([self.bindFunctionToButton("Load fullbody",\
                 self.Fullbody), self.bindFunctionToButton("Compute contacts",\
                 self.computeContacts), self.computeStatus]))
+        self.groupbox2 = QtGui.QGroupBox()
+        self.grid3 = QtGui.QGridLayout(self.groupbox2)
         self.slider = QtGui.QSlider(QtCore.Qt.Horizontal)
         self.slider.setMinimum(0)
         self.slider.setMaximum(100)
@@ -1253,15 +1302,28 @@ class _RbprmInterp (QtGui.QWidget):
         self.stop.setIcon(self.style().standardIcon(QtGui.QStyle.SP_MediaStop))
         self.pause = QtGui.QPushButton()
         self.pause.setIcon(self.style().standardIcon(QtGui.QStyle.SP_MediaPause))
-        vbox1.addWidget(self.addWidgetsInHBox([self.play, self.stop, self.pause, self.slider]))
+        playerlabel = QtGui.QLabel("Player")
+        pathslabel = QtGui.QLabel("Path ID:")
+        self.spinpaths = QtGui.QSpinBox()
+        self.spinpaths.setDisabled(True)
+        showlabel = QtGui.QLabel("Show:")
+        self.showcombo = QtGui.QComboBox()
+        self.grid3.addWidget(playerlabel, 0,0)
+        self.grid3.addWidget(showlabel, 1,0)
+        self.grid3.addWidget(self.showcombo, 1,1)
+        self.grid3.addWidget(pathslabel, 1,2)
+        self.grid3.addWidget(self.spinpaths, 1,3)
+        self.grid3.addWidget(self.addWidgetsInHBox([self.play, self.stop, self.pause, self.slider]), 2,0,1,4)
         self.play.setDisabled(True)
         self.stop.setDisabled(True)
         self.pause.setDisabled(True)
+        vbox1.addWidget(self.groupbox2)
 
+        self.showcombo.currentIndexChanged.connect(self.playerSettings)
         self.play.clicked.connect(self.playConfigs)
         self.stop.clicked.connect(self.stopPlayer)
         self.pause.clicked.connect(self.pausePlayer)
-        self.slider.valueChanged.connect(self.draw)
+        self.spinpaths.valueChanged.connect(self.updatePath)
         
         vbox1 = QtGui.QVBoxLayout(self)
         self.update ()
@@ -1316,7 +1378,18 @@ class _RbprmInterp (QtGui.QWidget):
                 item.addChild(child)
         self.chosenTree.addTopLevelItem(item)
         self.chosenTree.expandItem(item)
-        self.slider.setMaximum(len(self.configs)-1)
+        self.showcombo.clear()
+        self.showcombo.addItem ("Path")
+        self.showcombo.addItem ("Contact sequence")
+        idx = self.showcombo.findText(self.lastShow)
+        if idx > -1 :
+            self.showcombo.setCurrentIndex(idx)
+        if (hasattr (self.plugin.builder, 'name')\
+                and self.plugin.basicClient.robot.getRobotName() != self.plugin.builder.name):
+            self.showcombo.model().item(0).setEnabled(False)
+            self.showcombo.setCurrentIndex(1)
+        self.updatePath()
+        #self.slider.setMaximum(len(self.configs)-1)
         
     def addWidgetsInHBox(self, widgets):
         nameParentW = QtGui.QWidget(self)
@@ -1330,6 +1403,60 @@ class _RbprmInterp (QtGui.QWidget):
         button.text = buttonLabel
         button.connect ('clicked()', func)
         return button
+
+    def playerSettings(self):
+        self.stopped = False
+        self.paused = False
+        self.startPoint = 0
+        self.slider.setValue(0)
+        self.spinpaths.setValue(0)
+        self.lastShow = str(self.showcombo.currentText)
+        if hasattr (self.plugin.rbprmPath, 'ps'):
+            if str(self.showcombo.currentText) == "Path":
+                self.slider.valueChanged.connect(self.playPath)
+                self.slider.valueChanged.disconnect(self.draw)
+                nbPaths = self.plugin.rbprmPath.ps.numberPaths()
+                if nbPaths > 0:
+                    self.spinpaths.setDisabled(False)
+                    self.spinpaths.setRange(0,nbPaths-1)
+                    self.play.setDisabled(False)
+                    self.stop.setDisabled(False)
+                    self.pause.setDisabled(False)
+                else:
+                    self.spinpaths.setDisabled(True)
+                    self.play.setDisabled(True)
+                    self.stop.setDisabled(True)
+                    self.pause.setDisabled(True)
+            else: #text == Contact sequence
+                self.slider.valueChanged.connect(self.draw)
+                self.slider.valueChanged.disconnect(self.playPath)
+                if len(self.allConfigs) > 0:
+                    self.spinpaths.setDisabled(False)
+                    self.spinpaths.setRange(0,len(self.allConfigs)-1)
+                    self.play.setDisabled(False)
+                    self.stop.setDisabled(False)
+                    self.pause.setDisabled(False)
+                else:
+                    self.spinpaths.setDisabled(True)
+                    self.play.setDisabled(True)
+                    self.stop.setDisabled(True)
+                    self.pause.setDisabled(True)
+
+    def updatePath (self):
+        if hasattr (self.plugin.rbprmPath, 'ps'):
+            if str(self.showcombo.currentText) == "Path":
+                self.currentPath = self.spinpaths.value
+                self.slider.setMaximum(100)
+                self.slider.setValue(0)
+                self.startPoint = 0
+                self.endPoint = 100
+            else:
+                if len(self.allConfigs) > 0:
+                    self.configs = self.allConfigs[self.spinpaths.value]
+                    self.slider.setMaximum(len(self.configs)-1)
+                    self.slider.setValue(0)
+                    self.startPoint = 0
+                    self.endPoint = len(self.configs)-1
 
     def Fullbody (self):
         self.resetStatus()
@@ -1402,23 +1529,29 @@ class _RbprmInterp (QtGui.QWidget):
                 showdialog(msg)
             else:
                 #TODO check that init & goal not the same as this leads to segmentation fault
-                self.computeStatus.setText("Computing")
-                self.computeStatus.setStyleSheet("background-color: yellow")
-                t = Thread(target=self.contacts, args=(self,\
-                        self.plugin.rbprmPath.q_init, self.plugin.rbprmPath.q_goal))
-                t.start()
-                while t.is_alive():
-                    QtCore.QCoreApplication.processEvents()
-                    time.sleep(0.2)
-                self.plugin.r(self.q_init)
-                self.computeStatus.setText("Done")
-                self.computeStatus.setStyleSheet("background-color: green")
-                self.play.setDisabled(False)
-                self.stop.setDisabled(False)
-                self.pause.setDisabled(False)
-                self.update()
+                self.contactdialog = _ContactDialog(self.plugin)
+                if self.contactdialog.exec_():
+                    self.computeStatus.setText("Computing")
+                    self.computeStatus.setStyleSheet("background-color: yellow")
+                    t = Thread(target=self.contacts, args=(self,\
+                            self.plugin.rbprmPath.q_init, self.plugin.rbprmPath.q_goal,\
+                            self.contactdialog.spinBoxes[1].value, self.contactdialog.spinBoxes[0].value,\
+                            self.contactdialog.spinBoxes[2].value))
+                    t.start()
+                    while t.is_alive():
+                        QtCore.QCoreApplication.processEvents()
+                        time.sleep(0.2)
+                    self.plugin.r(self.q_init)
+                    #self.spinpaths.setValue(len(self.allConfigs)-1)
+                    self.playerSettings()
+                    self.computeStatus.setText("Done")
+                    self.computeStatus.setStyleSheet("background-color: green")
+                    self.play.setDisabled(False)
+                    self.stop.setDisabled(False)
+                    self.pause.setDisabled(False)
+                    self.update()
 
-    def contacts (self, tab, q_i, q_g):
+    def contacts (self, tab, q_i, q_g, dt, pathId, robustness):
         q_init = tab.plugin.fullbody.getCurrentConfig()
         q_init[0:7] = q_i[0:7]
         q_goal = tab.plugin.fullbody.getCurrentConfig();
@@ -1429,32 +1562,34 @@ class _RbprmInterp (QtGui.QWidget):
         tab.q_goal = tab.plugin.fullbody.generateContacts(q_goal, [0,0,1])
         tab.plugin.fullbody.setStartState(q_init,[])
         tab.plugin.fullbody.setEndState(q_goal,tab.legIds)        
-        configs = self.plugin.fullbody.interpolate(0.1, 1, 0)
+        configs = self.plugin.fullbody.interpolate(dt, pathId, robustness)
         tab.configs = configs[1:len(configs)-1]
+        tab.allConfigs.append (tab.configs)
 
     def playConfigs (self):
         self.resetStatus()
         self.stopped = False
         self.paused = False
         start = self.startPoint
-        if len (self.configs) > 0:
-            for i in range(start,len(self.configs) -1):
-                QtCore.QCoreApplication.processEvents()
-                self.slider.setValue(i)
-                if (self.paused):
-                    self.startPoint = i
-                    return
-                elif (self.stopped):
-                    self.startPoint = 0
-                    self.slider.setValue(1)
-                    return
-                time.sleep (0.2)
+        end = self.endPoint
+        #if len (self.configs) > 0:
+        for i in range(start,end):
+            QtCore.QCoreApplication.processEvents()
+            self.slider.setValue(i)
+            if (self.paused):
+                self.startPoint = i
+                return
+            elif (self.stopped):
+                self.startPoint = 0
+                self.slider.setValue(0)
+                return
+            time.sleep (0.2)
         self.startPoint = 0
 
     def stopPlayer (self):
         self.stopped = True
         self.startPoint = 0
-        self.slider.setValue(1)
+        self.slider.setValue(0)
 
     def pausePlayer (self):
         self.paused = True
@@ -1471,6 +1606,13 @@ class _RbprmInterp (QtGui.QWidget):
             flist.append(float(s))
         return flist
     
+    def playPath(self, i):
+        if self.plugin.basicClient.problem.numberPaths() > 0:
+            pathLength = self.plugin.rbprmPath.ps.pathLength(self.currentPath)
+            pos = float(float(i)/float(self.slider.maximum))
+            q = self.plugin.basicClient.problem.configAtParam(self.currentPath, pos*pathLength)
+            self.plugin.r(q)
+
     def draw(self, i):
         if len(self.configs) > 0:
             config = self.configs[i]
@@ -1493,10 +1635,6 @@ class _RbprmInterp (QtGui.QWidget):
         self.computeStatus.setStyleSheet("background-color: blue")
 
     def validateSettings (self):
-     #   if hasattr (self.plugin.builder, 'name') == False:
-     #       msg = "Please add rom robot model before setting solver options."
-     #       showdialog(msg)
-     #       return
         if self.plugin.rbprmPath.analysed == False and str(self.validations.currentText) == "RbprmPathValidation":
             msg = "You need to run the affordance search before adding rbprm path validators."
             showdialog(msg)
@@ -1578,7 +1716,7 @@ class Plugin(QtGui.QDockWidget):
         #self.cursor.setShape (QtCore.Qt.ClosedHandCursor)
         # add shortcut:
         action = self.toggleViewAction()
-        action.setShortcut(QtGui.QKeySequence("Ctrl+Alt+A"))
+        action.setShortcut(QtGui.QKeySequence("Ctrl+Alt+R"))
         #initialise tab widget
         self.tabWidget = QtGui.QTabWidget()
         self.setWidget (self.tabWidget)
