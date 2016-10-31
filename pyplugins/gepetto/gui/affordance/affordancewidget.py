@@ -1241,6 +1241,7 @@ class _ContactDialog(QtGui.QDialog):
         else:
             self.spinBoxes[0].setDisabled(True)
         self.spinBoxes[1].setSingleStep(0.01)
+        self.spinBoxes[1].setValue(0.1)
         self.spinBoxes[2].setSingleStep(0.01)
         label1 = QtGui.QLabel("Path:")
         label2 = QtGui.QLabel("Timestep:")
