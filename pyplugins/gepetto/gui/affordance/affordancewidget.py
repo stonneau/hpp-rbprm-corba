@@ -278,7 +278,6 @@ class _RbprmPath (QtGui.QWidget):
                 showdialog(msg)
                 return
             self.latestRobotInfo = info
-            #self.plugin.builder = Builder ()
             t = Thread(target=self.loadRobot, args=(self, info))
             t.start()
             while t.is_alive():
@@ -289,6 +288,8 @@ class _RbprmPath (QtGui.QWidget):
                 self.plugin.viewCreated = True
             self.addToViewer()
             self.plugin.client.gui.setVisibility(self.plugin.builder.name, "ON")
+            if self.robotdialog.tick2.checkState() == QtCore.Qt.Checked:
+                self.setScenario (self.plugin, self.robotdialog.extraInfo)
         self.update()
 
     def loadRobot (self, tab, info):
@@ -316,6 +317,37 @@ class _RbprmPath (QtGui.QWidget):
 
     def loadEnvironment (self, viewer, info):
         viewer.loadObstacleModel (info[0],info[1],info[2])
+
+    def setScenario (self,plugin,info):
+        t = Thread(target=self.scenario, args=(plugin, info))
+        t.start()
+        while t.is_alive():
+            QtCore.QCoreApplication.processEvents()
+            time.sleep(0.2)
+        
+    def scenario (self, plugin, info):
+        self.loadEnvironment (plugin.r, info[0])
+        plugin.builder.setFilter(info[1])
+        for i in range (len(info[1])):
+            plugin.builder.setAffordanceFilter(info[1][i], info[2][i])
+        for i in range (len(info[3])):
+            plugin.builder.setJointBounds (info[3][i], info[4][i])
+        if (len(info[5]) == 6):
+            plugin.builder.boundSO3(info[5])
+            plugin.SO3bounds = info[5]
+        plugin.basicClient.problem.setInitialConfig(info[6])
+        self.initConfigSet = True
+        plugin.builder.setCurrentConfig (info[6])
+        plugin.rbprmPath.ps.addGoalConfig(info[7])
+        for i in range (len (info[8])):
+            plugin.rbprmPath.ps.addPathOptimizer(info[8][i])
+        plugin.rbprmPath.ps.client.problem.selectConFigurationShooter(info[9])
+        objects = plugin.basicClient.obstacle.getObstacleNames(False,True)
+        self.analyse(objects)
+        self.visualiseAllAffordances ('Support', [1,0,0,1])
+        self.visualiseAllAffordances ('Lean', [0,1,0,1])
+        self.analysed = True
+        self.ps.client.problem.selectPathValidation(info[10],info[11])
 
     def JointBounds (self):
         if hasattr(self.plugin.builder, 'name'):
@@ -1001,8 +1033,7 @@ class _EnvDialog(QtGui.QDialog):
 class _RobotDialog(_EnvDialog):
     def __init__(self, parent=None):
         super(_RobotDialog, self).__init__(parent)
-        #self.grid2.removeWidget(self.envText6)
-        #self.grid2.removeWidget(self.urdfromName)
+        self.extraInfo = []
         text = QtGui.QLabel('Root-joint type')
         self.rootJoint = QtGui.QComboBox()
         self.rootJoint.addItem("freeflyer")
@@ -1014,6 +1045,9 @@ class _RobotDialog(_EnvDialog):
         self.urdfromName = QtGui.QLineEdit("")
         self.grid2.addWidget (self.envText6, 4,0)
         self.grid2.addWidget (self.urdfromName, 4,2)
+        self.tick2 = QtGui.QCheckBox('Load full scenario')
+        self.grid.addWidget (self.tick2, 4,0)
+        self.tick2.setDisabled(True)
         self.Envname.setHidden(True)
         self.text2.setHidden(True)
         self.urdfSuf.setHidden(False)
@@ -1041,6 +1075,12 @@ class _RobotDialog(_EnvDialog):
             self.rootJoint.setCurrentIndex(idx)
         self.urdfSuf.setText(info[6])
         self.srdfSuf.setText(info[7])
+        self.extraInfo = info[8:20]
+        print (self.extraInfo[1])
+        if self.extraInfo[1] == []:
+            self.tick2.setDisabled(True)
+        else:
+            self.tick2.setDisabled(False)
 
 class _FullBodyDialog (_RobotDialog):
     def __init__(self, parent=None):
@@ -1794,9 +1834,6 @@ class Settings ():
     def readRobots(self):
         # second argument is directory name as follows: path/[gepetto-gui]/[rbprmRobots].conf
         robot = QtCore.QSettings (QtCore.QSettings.SystemScope,"gepetto-gui", "rbprmRoms")
-        #robot.setValue("test", "value");
-        #keys = robot.allKeys()
-        #print (keys)
         if (robot.status () != QtCore.QSettings.NoError):
             msg = "Error occurred when opening rbprm-robot config file."
             showdialog(msg)
@@ -1818,6 +1855,61 @@ class Settings ():
                 info.append (str(robot.value("Package", "")))
                 info.append (str(robot.value("URDFSuffix", "")))
                 info.append (str(robot.value("SRDFSuffix", "")))
+                Environment = robot.value("Environment", "")
+                env = []
+                for e in Environment:
+                    env.append(str(e))
+                info.append(env)
+                Filters = robot.value("SetFilter", "")
+                fil = []
+                for f in Filters:
+                    fil.append(str(f))
+                info.append (fil)
+                affFilters = robot.value("AffordanceFilter", "")
+                afil = []
+                for f in affFilters:
+                    afil.append((str(f)).split('.'))
+                info.append (afil)
+                boundedJoints = []; jointSizes = []; jointBounds = []
+                boundedJoints.append(robot.value("BoundedJoints", ""))
+                jointSizes.append (robot.value("BoundedJointSizes", 0))
+                jointBounds.append (robot.value("JointBounds"))
+                nbBJ = len(boundedJoints)
+                bJoints = []
+                jBounds = []
+                for i in range (nbBJ):
+                    bJoints.append (str(boundedJoints[i]))
+                    dof = int(jointSizes[i])
+                    bounds = []
+                    for j in range (dof):
+                        bounds.append (float(jointBounds[i][j]))
+                    jBounds.append (bounds)
+                info.append(bJoints)
+                info.append(jBounds)
+                so3 = robot.value("BoundSO3", [0,])
+                so3vec = []
+                if len(so3) == 6:
+                    for i in range (6):
+                        so3vec.append(float(so3[i]))
+                else:
+                    so3vec = [1,0,1,0,1,0]
+                info.append(so3vec)
+                qini = robot.value("InitialConfig", [0,])
+                qgoal = robot.value("GoalConfig", [0,])
+                qi = []; qg = []
+                for i in range (len(qini)):
+                    qi.append(float(qini[i]))
+                    qg.append(float(qgoal[i]))
+                info.append (qi)
+                info.append (qg)
+                pathOptims = []; pathOptims.append (robot.value("PathOptimisers"))
+                optims = []
+                for i in range (len(pathOptims)):
+                    optims.append (str(pathOptims[i]))
+                info.append(optims)
+                info.append(str(robot.value("ConfigurationShooter")))
+                info.append(str(robot.value("PathValidation")))
+                info.append(float(robot.value("ValidationTolerance", 0.04)))
                 infos.append(info)
                 robot.endGroup()
             return infos
