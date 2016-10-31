@@ -68,6 +68,15 @@ To install hpp-rbprm-corba:
 #### Basic usage of gepetto-gui
 Gepetto-gui is a interactive viewer application implemented within the package [gepetto-viewer-corba](https://github.com/anna-seppala/gepetto-viewer-corba/tree/affordance). After installing this package, launch the binary file `gepetto-gui` and do as in [this video](http://homepages.laas.fr/jmirabel/raw/videos/hpp-gui-example.mp4).
 
+In order to install rbprm-plugin, type: 
+```
+    cd $HPP_RBPRM_CORBA_DIR/build
+    ccmake ..
+```
+In the settings, make sure that the cmake variable BUILD_HPP_RBPRM_PLUGIN is turned ON before installing the project.
+#### Tutorial
+[This video](https://youtu.be/tUH5JqmmEog) provides a short tutorial on how to use the rbprm-plugin to create and solve a path planning problem with multiple contacts.
+
 #### Adding predefined robots and environments for rbprm-plugin
 For convenience, rom robots, full-body robots and environments can be predefined.
 
