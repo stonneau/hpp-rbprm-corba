@@ -25,20 +25,22 @@ fullBody.client.basic.robot.setDimensionExtraConfigSpace(tp.extraDof)
 ps = tp.ProblemSolver( fullBody )
 r = tp.Viewer (ps,viewerClient=tp.r.client)
 
+
 #~ AFTER loading obstacles
 rLegId = 'hrp2_rleg_rom'
 rLeg = 'RLEG_JOINT0'
 rLegOffset = [0,0,-0.105]
 rLegNormal = [0,0,1]
 rLegx = 0.09; rLegy = 0.05
-fullBody.addLimb(rLegId,rLeg,'',rLegOffset,rLegNormal, rLegx, rLegy, 20000, "EFORT_Normal", 0.1)
+fullBody.addLimb(rLegId,rLeg,'',rLegOffset,rLegNormal, rLegx, rLegy, 20000, "manipulability", 0.1)
 
 lLegId = 'hrp2_lleg_rom'
 lLeg = 'LLEG_JOINT0'
 lLegOffset = [0,0,-0.105]
 lLegNormal = [0,0,1]
 lLegx = 0.09; lLegy = 0.05
-fullBody.addLimb(lLegId,lLeg,'',lLegOffset,rLegNormal, lLegx, lLegy, 20000, "EFORT_Normal", 0.1)
+fullBody.addLimb(lLegId,lLeg,'',lLegOffset,rLegNormal, lLegx, lLegy, 20000, "manipulability", 0.1)
+
 
 rarmId = 'hrp2_rarm_rom'
 rarm = 'RARM_JOINT0'
@@ -77,15 +79,17 @@ lLegx = 0.05; lLegy = 0.05
 #~ fullBody.addLimb(lKneeId,lLeg,lKnee,lLegOffset,lLegNormal, lLegx, lLegy, 10000, 0.01)
  #~ 
 
-#~ fullBody.runLimbSampleAnalysis(rLegId, "jointLimitsDistance", True)
-#~ fullBody.runLimbSampleAnalysis(lLegId, "jointLimitsDistance", True)
+fullBody.runLimbSampleAnalysis(rLegId, "jointLimitsDistance", True)
+fullBody.runLimbSampleAnalysis(lLegId, "jointLimitsDistance", True)
 
 #~ fullBody.client.basic.robot.setJointConfig('LARM_JOINT0',[1])
 #~ fullBody.client.basic.robot.setJointConfig('RARM_JOINT0',[-1])
 
 
 """
-
+fullBody.runLimbSampleAnalysis(rLegId, "manipulability", True)
+fullBody.runLimbSampleAnalysis(lLegId, "jointLimitsDistance", True)
+fullBody.runLimbSampleAnalysis(rarmId, "jointLimitsDistance", True)
 
 q_0 = fullBody.getCurrentConfig(); 
 #~ fullBody.createOctreeBoxes(r.client.gui, 1, rarmId, q_0,)
@@ -97,6 +101,7 @@ fullBody.setCurrentConfig (q_init)
 configSize = fullBody.getConfigSize() -fullBody.client.basic.robot.getDimensionExtraConfigSpace()
 
 q_init = fullBody.getCurrentConfig(); q_init[0:7] = tp.ps.configAtParam(0,0.01)[0:7] # use this to get the correct orientation
+q_init[2] = 0.648702
 q_goal = fullBody.getCurrentConfig(); q_goal[0:7] = tp.ps.configAtParam(0,tp.ps.pathLength(0))[0:7]
 dir_init = tp.ps.configAtParam(0,0.01)[tp.indexECS:tp.indexECS+3]
 acc_init = tp.ps.configAtParam(0,0.01)[tp.indexECS+3:tp.indexECS+6]
@@ -105,11 +110,11 @@ acc_goal = tp.ps.configAtParam(0,tp.ps.pathLength(0))[tp.indexECS+3:tp.indexECS+
 
 
 
-fullBody.setStaticStability(False)
+#~ fullBody.setStaticStability(True)
 # Randomly generating a contact configuration at q_init
 fullBody.setCurrentConfig (q_init)
 r(q_init)
-q_init = fullBody.generateContacts(q_init,dir_init,acc_init)
+#~ q_init = fullBody.generateContacts(q_init,dir_init,acc_init)
 r(q_init)
 
 # Randomly generating a contact configuration at q_end
@@ -126,12 +131,15 @@ q_goal[configSize+3:configSize+6] = acc_goal[::]
 r(q_init)
 
 
-fullBody.setStartState(q_init,[rLegId,lLegId,rarmId])
+#~ fullBody.setStartState(q_init,[rLegId,lLegId,rarmId])
+fullBody.setStartState(q_init,[rLegId,lLegId])
 fullBody.setEndState(q_goal,[rLegId,lLegId])
 
 
 
-configs = fullBody.interpolate(0.08,pathId=0,robustnessTreshold = 1, filterStates = True)
+#~ configs = fullBody.interpolate(0.08,pathId=0,robustnessTreshold = 1, filterStates = False)
+#~ configs = fullBody.interpolate(0.04,pathId=0,robustnessTreshold = 1, filterStates = True)
+configs = fullBody.interpolate(0.001,pathId=0,robustnessTreshold = 1, filterStates = True)
 print "number of configs :", len(configs)
 
 
@@ -144,5 +152,9 @@ player = Player(fullBody,pp,tp,configs,draw=False,optim_effector=False,use_veloc
 
 player.displayContactPlan()
 
+from fullBodyPlayerHrp2 import Player
+player = Player(fullBody,pp,tp,configs,draw=False,optim_effector=False,use_velocity=True,pathId= 0)
+
+player.interpolate(begin, end)
 
 

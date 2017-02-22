@@ -1004,6 +1004,15 @@ namespace hpp {
         }
     }
 
+    std::vector<std::string> extractEffectorsName(const rbprm::T_Limb& limbs)
+    {
+        std::vector<std::string> res;
+        for(rbprm::T_Limb::const_iterator cit = limbs.begin(); cit != limbs.end(); ++cit)
+            res.push_back(cit->first);
+        return res;
+    }
+
+
     void SetPositionAndNormal(rbprm::State& state,
 			hpp::rbprm::RbPrmFullBodyPtr_t fullBody, const hpp::floatSeq& configuration,
             std::vector<std::string>& names)
@@ -1030,6 +1039,12 @@ namespace hpp {
             state.contacts_[*cit] = true;
             state.contactOrder_.push(*cit);
         }        
+        // adding remaining contacts to contact order
+
+        /*std::vector<std::string> effNames(extractEffectorsName(fullBody->GetLimbs()));
+        std::vector<std::string> freeLimbs = rbprm::freeEffectors(state,effNames.begin(), effNames.end() );
+        for(std::vector<std::string>::const_iterator cit = freeLimbs.begin(); cit != freeLimbs.end(); ++cit)
+            state.contactOrder_.push(*cit);*/
         state.nbContacts = state.contactNormals_.size() ;
         state.configuration_ = config;
         state.robustness =  stability::IsStable(fullBody,state);
@@ -1220,14 +1235,15 @@ namespace hpp {
         success = false;
         std::vector<std::string> breaks;
         thirdState.contactBreaks(firstState, breaks);
-        if(breaks.size() > 1)
+        if(breaks.size() > 2)
         {
             throw std::runtime_error ("too many contact breaks between states" + std::string(""+cId) + "and " + std::string(""+(cId + 1)));
         }
-        if(breaks.size() == 1)
+        if(breaks.size() >0)
         {
             State intermediary(firstState);
-            intermediary.RemoveContact(*breaks.begin());
+            for(std::vector<std::string>::const_iterator cit = breaks.begin(); cit !=breaks.end(); ++cit)
+                intermediary.RemoveContact(*cit);
             success = true;
             return intermediary;
         }
