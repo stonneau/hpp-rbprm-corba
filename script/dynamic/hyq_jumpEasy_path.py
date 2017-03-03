@@ -86,8 +86,8 @@ pp = PathPlayer (rbprmBuilder.client.basic, r)
 pp.dt=1./30.
 #r.client.gui.removeFromGroup("rm0",r.sceneName)
 pp.displayVelocityPath(0)
-pp.speed=0.2
-pp(0)
+pp.speed=1
+#~ pp(0)
 
 """
 

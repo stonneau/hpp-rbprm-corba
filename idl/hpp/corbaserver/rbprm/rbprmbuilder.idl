@@ -249,6 +249,21 @@ module hpp
     /// \param contactLimbs ids of the limb in contact for the state
     void setStartState(in floatSeq dofArray, in Names_t contactLimbs) raises (Error);
 
+    /// Add state at end of lastcomputed state
+    /// environment, ordered by their efficiency
+    /// \param dofArray configuration of the robot
+    /// \param contactLimbs ids of the limb in contact for the state
+    /// \param time time at which state is reached
+    void addState(in floatSeq dofArray, in Names_t contactLimbs, in double time) raises (Error);
+
+    /// Removes a state
+    /// \param stateId id of the state to be removed
+    void removeState(in unsigned short stateId) raises (Error);
+
+    /// Replace a state configuration
+    /// \param stateId id of the state to be removed
+    void setStateConfig(in unsigned short stateId, in floatSeq dofArray) raises (Error);
+
     /// Compute effector contact points and normals for a given configuration
     /// in local coordinates
     /// \param dofArray configuration of the robot
@@ -374,6 +389,15 @@ module hpp
     /// \param numOptimizations Number of iterations of the shortcut algorithm to apply between each states
     /// \return id of the root path computed
     short comRRT(in double state1, in double state2,  in  unsigned short comPath, in unsigned short numOptimizations) raises (Error);
+
+    /// Creates a path between two configurations that follows a root path, disregarding collisions, contacts etc
+    /// \param state1 index of first state.
+    /// \param state2 index of second state.
+    /// \param comPath index of the path considered of the com path
+    /// \param numOptimizations Number of iterations of the shortcut algorithm to apply between each states
+    /// \return id of the root path computed
+    short rootConstraint(in double state1, in double state2,  in  unsigned short rootPath) raises (Error);
+
 
     /// Provided a path has already been computed and interpolated, generate a continuous path
     /// between two indicated states. The states do not need to be consecutive, but increasing in Id.

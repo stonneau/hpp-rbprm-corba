@@ -155,6 +155,9 @@ namespace hpp {
 
         virtual void setStartState(const hpp::floatSeq& configuration, const hpp::Names_t& contactLimbs) throw (hpp::Error);
         virtual void setEndState(const hpp::floatSeq& configuration, const hpp::Names_t& contactLimbs) throw (hpp::Error);
+        virtual void addState(const hpp::floatSeq& configuration, const hpp::Names_t& contactLimbs, const double time) throw (hpp::Error);
+        virtual void removeState(unsigned short cId) throw (hpp::Error);
+        virtual void setStateConfig(unsigned short cId, const hpp::floatSeq& configuration) throw (hpp::Error);
         virtual hpp::floatSeq*  computeContactForConfig(const hpp::floatSeq& configuration, const char* limbNam) throw (hpp::Error);
         virtual hpp::floatSeqSeq* computeContactPoints(unsigned short cId) throw (hpp::Error);
         virtual hpp::floatSeqSeq* computeContactPointsForLimb(unsigned short cId, const char* limbName) throw (hpp::Error);
@@ -170,6 +173,7 @@ namespace hpp {
         virtual CORBA::Short limbRRTFromRootPath(double state1, double state2, unsigned short path, unsigned short numOptimizations) throw (hpp::Error);
         virtual CORBA::Short configToPath(const hpp::floatSeqSeq& configs) throw (hpp::Error);
         virtual CORBA::Short comRRT(double state1, double state2, unsigned short path, unsigned short numOptimizations) throw (hpp::Error);
+        virtual CORBA::Short rootConstraint(double state1, double state2, unsigned short path) throw (hpp::Error);
 
         typedef core::PathPtr_t (*t_rrt)
             (RbPrmFullBodyPtr_t, core::ProblemPtr_t, const core::PathPtr_t,

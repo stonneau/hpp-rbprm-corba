@@ -269,6 +269,31 @@ class FullBody (object):
     def setStartState(self, configuration, contacts):
 		return self.client.rbprm.rbprm.setStartState(configuration, contacts)
 		
+	## Initialize the first configuration of the path discretization 
+	# with a balanced configuration for the interpolation problem;
+	#
+    # \param configuration the desired start configuration
+    # \param contacts the array of limbs in contact
+    def addState(self, configuration, contacts, time):
+		return self.client.rbprm.rbprm.addState(configuration, contacts, time)
+		
+		
+	## Initialize the first configuration of the path discretization 
+	# with a balanced configuration for the interpolation problem;
+	#
+    # \param configuration the desired start configuration
+    # \param contacts the array of limbs in contact
+    def setStateConfig(self, sid, configuration):
+		return self.client.rbprm.rbprm.setStateConfig(sid, configuration)
+			
+	## Initialize the first configuration of the path discretization 
+	# with a balanced configuration for the interpolation problem;
+	#
+    # \param configuration the desired start configuration
+    # \param contacts the array of limbs in contact
+    def removeState(self, stateId):
+		return self.client.rbprm.rbprm.removeState(stateId)
+		
 	## Create a state given a configuration and contacts
 	#
     # \param configuration the desired start configuration

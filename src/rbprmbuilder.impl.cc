@@ -25,6 +25,7 @@
 #include "hpp/rbprm/interpolation/limb-rrt.hh"
 #include "hpp/rbprm/interpolation/com-rrt.hh"
 #include "hpp/rbprm/interpolation/com-trajectory.hh"
+#include "hpp/rbprm/interpolation/interpolation-constraints.hh"
 #include "hpp/rbprm/interpolation/spline/effector-rrt.hh"
 #include "hpp/rbprm/projection/projection.hh"
 #include "hpp/rbprm/contact_generation/contact_generation.hh"
@@ -1020,6 +1021,7 @@ namespace hpp {
                 throw std::runtime_error ("Impossible to find limb for joint "
                                           + (*cit) + " to robot; limb not defined");
             }
+            std::cout << "adding contact " << std::endl;
             const core::JointPtr_t joint = fullBody->device_->getJointByName(lit->second->effector_->name());
             const fcl::Transform3f& transform =  joint->currentTransformation ();
             const fcl::Matrix3f& rot = transform.getRotation();
@@ -1031,6 +1033,7 @@ namespace hpp {
             state.contactOrder_.push(*cit);
         }        
         state.nbContacts = state.contactNormals_.size() ;
+
         state.configuration_ = config;
         state.robustness =  stability::IsStable(fullBody,state);
         std::cout  << "is stable " << state.robustness << std::endl;
@@ -1051,6 +1054,49 @@ namespace hpp {
         }
     }
 
+
+    void RbprmBuilder::addState(const hpp::floatSeq& configuration, const hpp::Names_t& contactLimbs, const double time) throw (hpp::Error)
+    {
+        try
+        {
+            std::cout << "num states " << lastStatesComputed_.size() << std::endl;
+            std::cout << "num states time " << lastStatesComputedTime_.size() << std::endl;
+            State state;
+            std::vector<std::string> names = stringConversion(contactLimbs);
+            SetPositionAndNormal(state,fullBody_, configuration, names);
+            lastStatesComputedTime_.push_back(std::make_pair(time,state));
+            lastStatesComputed_.push_back(state);
+            std::cout << "num states " << lastStatesComputed_.size() << std::endl;
+            std::cout << "num states time " << lastStatesComputedTime_.size() << std::endl;
+        }
+        catch(std::runtime_error& e)
+        {
+            throw Error(e.what());
+        }
+    }
+
+    void RbprmBuilder::removeState(unsigned short cId) throw (hpp::Error)
+    {
+        if(lastStatesComputed_.size() <= cId)
+        {
+            std::cout << "num states " << lastStatesComputed_.size() << std::endl;
+            std::cout << "num states time " << lastStatesComputedTime_.size() << std::endl;
+            throw std::runtime_error ("Unexisting state " + std::string(""+(cId+1)));
+        }
+        lastStatesComputed_.erase(lastStatesComputed_.begin()+cId);
+        lastStatesComputedTime_.erase(lastStatesComputedTime_.begin()+cId);
+    }
+
+    void RbprmBuilder::setStateConfig(unsigned short cId, const hpp::floatSeq& configuration) throw (hpp::Error)
+    {
+        if(lastStatesComputed_.size() <= cId)
+        {
+            throw std::runtime_error ("Unexisting state " + std::string(""+(cId)));
+        }
+        model::Configuration_t config = dofArrayToConfig (fullBody_->device_, configuration);
+        lastStatesComputed_[cId].configuration_=config;
+        lastStatesComputedTime_[cId].second.configuration_=config;
+    }
 
     hpp::floatSeq* RbprmBuilder::computeContactForConfig(const hpp::floatSeq& configuration, const char *limbNam) throw (hpp::Error)
     {
@@ -1621,9 +1667,65 @@ assert(s2 == s1 +1);
             {
                 throw std::runtime_error ("No path computed, cannot interpolate ");
             }
-            core::PathPtr_t path = interpolation::comRRT(fullBody_,problemSolver_->problem(), problemSolver_->paths()[pathId],
+            core::SizeInterval_t interval(0,3);
+            core::SizeIntervals_t intervals;
+            intervals.push_back(interval);
+            PathPtr_t reducedPath = core::SubchainPath::create(problemSolver_->paths()[pathId],intervals);
+            core::PathPtr_t path = interpolation::comRRT(fullBody_,problemSolver_->problem(), reducedPath,
                                                                           *(lastStatesComputed_.begin()+s1),*(lastStatesComputed_.begin()+s2), numOptimizations);
             return AddPath(path,problemSolver_);
+        }
+        catch(std::runtime_error& e)
+        {
+            throw Error(e.what());
+        }
+    }
+
+    CORBA::Short RbprmBuilder::rootConstraint(double state1, double state2, unsigned short path) throw (hpp::Error)
+    {
+        try
+        {
+            std::size_t s1((std::size_t)state1), s2((std::size_t)state2);
+// temp
+assert(s2 == s1 +1);
+            if(lastStatesComputed_.size () < s1 || lastStatesComputed_.size () < s2 )
+            {
+                throw std::runtime_error ("did not find a states at indicated indices: " + std::string(""+s1) + ", " + std::string(""+s2));
+            }
+            unsigned int pathId = (unsigned int)(path);
+            if(problemSolver_->paths().size() <= pathId)
+            {
+                throw std::runtime_error ("No path computed, cannot interpolate ");
+            }
+
+            const State& from = *(lastStatesComputed_.begin()+s1);
+            const State& to = *(lastStatesComputed_.begin()+s2);
+
+            core::SizeInterval_t interval(0,3);
+            core::SizeIntervals_t intervals;
+            intervals.push_back(interval);
+            PathPtr_t reducedPath = core::SubchainPath::create(problemSolver_->paths()[pathId],intervals);
+            core::PathPtr_t unusedPath(StraightPath::create(fullBody_->device_,from.configuration_, from.configuration_,0));
+            interpolation::ComRRTShooterFactory unusedFactory(unusedPath);
+            interpolation::SetComRRTConstraints constraintFactory;
+            interpolation::ComRRTHelper helper(fullBody_, unusedFactory, constraintFactory, problemSolver_->problem(),reducedPath, 0.001);
+            helper.InitConstraints();
+            interpolation::CreateRootConstraint<interpolation::ComRRTHelper,core::PathPtr_t>(helper, helper.refPath_,from.configuration_.head<3>());
+
+            model::Configuration_t fromL = helper.fullBodyDevice_->currentConfiguration();
+            fromL.head(from.configuration_.rows()) = from.configuration_;
+            model::Configuration_t toL = fromL;
+            toL.head(from.configuration_.rows()) = to.configuration_;
+            //toL[toL.rows()-1]=reducedPath->length();
+            toL[toL.rows()-1]=1.;
+            core::PathPtr_t constrainedPath = helper.steeringMethod_->impl_compute(fromL,toL);
+
+            core::SizeInterval_t interval2(0, from.configuration_.rows());
+            core::SizeIntervals_t intervals2;
+            intervals2.push_back(interval2);
+            PathPtr_t finalPath = core::SubchainPath::create(constrainedPath,intervals2);
+
+            return AddPath(finalPath,problemSolver_);
         }
         catch(std::runtime_error& e)
         {
