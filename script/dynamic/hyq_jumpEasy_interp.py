@@ -84,7 +84,13 @@ fullBody.setEndState(q_goal,[larmId,rLegId,rarmId,lLegId])
 r(q_init)
 # computing the contact sequence
 # configs = fullBody.interpolate(0.12, 10, 10, True) #Was this (Pierre)
-configs = fullBody.interpolate(0.001,pathId=0,robustnessTreshold = 3, filterStates = True)
+
+
+pathIdJump = 1
+pathIdPrep = 2
+
+
+configs = fullBody.interpolate(0.001,pathId=pathIdPrep,robustnessTreshold = 3, filterStates = True)
 
 
 print "configs size = ",len(configs)
@@ -126,10 +132,9 @@ hyq_ref = [-1.652528468457493,
  
 
 #retrieve ballistic path
-pp.client.problem.extractPath(0,1,1.1)
 #now for the crazy interpolation
 time_to = 0 #fullBody.getTimeAtState(len(configs[-1]))
-time_land = ps.pathLength(1)
+time_land = ps.pathLength(pathIdJump)
 
 #first remove useless last state
 fullBody.removeState(len(configs)-1)
@@ -138,7 +143,7 @@ configs=configs[:-1][:]
 #then replace last config before jump
 to_conf = configs[-1]
 #project it onto ground
-to_root_config = pp.client.problem.configAtParam(1,time_to)
+to_root_config = pp.client.problem.configAtParam(pathIdJump,time_to)
 to_com = to_root_config[0:3]
 q_to= (fullBody.projectToCom(len(configs)-1,to_com))
 #~ to_com = to_root_config[0:7]
@@ -158,7 +163,7 @@ fullBody.addState(q_to,[],0)
 #computing a suitable end configuration
 q_land = configs[-1][:]
 q_land[0:len(hyq_ref)] = hyq_ref
-land_root_config = pp.client.problem.configAtParam(1,time_land)
+land_root_config = pp.client.problem.configAtParam(pathIdJump,time_land)
 land_com = land_root_config[0:3]
 q_land[0:len(land_root_config)-6] = land_root_config[:-6]
 q_land = fullBody.generateContacts(q_land,dir_init,acc_init)
@@ -189,9 +194,19 @@ camera = [0.5681925415992737,
 r.client.gui.setCameraTransform(0,camera)
 
 """
+fullBody.client.rbprm.rbprm.rootConstraint(state_land_id-1, state_land_id, 1)
+
+from hpp.corbaserver.rbprm.tools.path_to_trajectory import gen_trajectory_to_play, play_trajectory
+
+#~ traj = gen_trajectory_to_play(fullBody, pp, [2], [time_land-time_to])
+traj = gen_trajectory_to_play(fullBody, pp, [pathIdJump+2], [time_land-time_to])
 
 
 
+from hpp.corbaserver.rbprm.tools.cwc_trajectory_helper import trajec
+trajec = traj
+#~ 
+#~ trajec +=[traj] 
 
 
 

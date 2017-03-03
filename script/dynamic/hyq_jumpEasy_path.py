@@ -105,6 +105,10 @@ q = Quaternion.Quaternion([1,0,0],[2,3,-1])
 
 """
 
+#separate paths
+pp.client.problem.extractPath(0,1,1.1) #fly
+pp.client.problem.extractPath(0,0,1) #prepare
+
 q_far = q_init[::]
 q_far[2] = -3
 r(q_far)
