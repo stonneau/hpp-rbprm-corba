@@ -1681,6 +1681,36 @@ assert(s2 == s1 +1);
         }
     }
 
+    CORBA::Short RbprmBuilder::comRRT(double state1, double state2, unsigned short path, unsigned short numOptimizations) throw (hpp::Error)
+    {
+        try
+        {
+            std::size_t s1((std::size_t)state1), s2((std::size_t)state2);
+// temp
+assert(s2 == s1 +1);
+            if(lastStatesComputed_.size () < s1 || lastStatesComputed_.size () < s2 )
+            {
+                throw std::runtime_error ("did not find a states at indicated indices: " + std::string(""+s1) + ", " + std::string(""+s2));
+            }
+            unsigned int pathId = (unsigned int)(path);
+            if(problemSolver_->paths().size() <= pathId)
+            {
+                throw std::runtime_error ("No path computed, cannot interpolate ");
+            }
+            core::SizeInterval_t interval(0,3);
+            core::SizeIntervals_t intervals;
+            intervals.push_back(interval);
+            PathPtr_t reducedPath = core::SubchainPath::create(problemSolver_->paths()[pathId],intervals);
+            core::PathPtr_t path = interpolation::comRRT(fullBody_,problemSolver_->problem(), reducedPath,
+                                                                          *(lastStatesComputed_.begin()+s1),*(lastStatesComputed_.begin()+s2), numOptimizations);
+            return AddPath(path,problemSolver_);
+        }
+        catch(std::runtime_error& e)
+        {
+            throw Error(e.what());
+        }
+    }
+
     CORBA::Short RbprmBuilder::rootConstraint(double state1, double state2, unsigned short path) throw (hpp::Error)
     {
         try
@@ -1724,7 +1754,7 @@ assert(s2 == s1 +1);
             core::SizeIntervals_t intervals2;
             intervals2.push_back(interval2);
             PathPtr_t finalPath = core::SubchainPath::create(constrainedPath,intervals2);
-
+            AddPath(constrainedPath,problemSolver_);
             return AddPath(finalPath,problemSolver_);
         }
         catch(std::runtime_error& e)

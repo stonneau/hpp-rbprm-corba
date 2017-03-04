@@ -90,7 +90,7 @@ pathIdJump = 1
 pathIdPrep = 2
 
 
-configs = fullBody.interpolate(0.001,pathId=pathIdPrep,robustnessTreshold = 3, filterStates = True)
+configs = fullBody.interpolate(0.001,pathId=pathIdPrep,robustnessTreshold = 3, filterStates = False)
 
 
 print "configs size = ",len(configs)
@@ -200,11 +200,41 @@ from hpp.corbaserver.rbprm.tools.path_to_trajectory import gen_trajectory_to_pla
 
 #~ traj = gen_trajectory_to_play(fullBody, pp, [2], [time_land-time_to])
 traj = gen_trajectory_to_play(fullBody, pp, [pathIdJump+2], [time_land-time_to])
-
+traj+=[target_config]
 
 
 from hpp.corbaserver.rbprm.tools.cwc_trajectory_helper import trajec
 trajec = traj
+
+from time import sleep
+
+def displayContactPlan(self,pause = 0.5):
+	r.client.gui.setVisibility("hyq", "ON")
+	tp.r.client.gui.setVisibility("toto", "OFF")
+	tp.r.client.gui.setVisibility("hyq_trunk", "OFF")
+	global configs
+	for _, q in enumerate(configs):
+		r(q);
+		sleep(pause)	
+
+def displayContactPlanJump(self,pause = 0.5):
+	r.client.gui.setVisibility("hyq", "ON")
+	tp.r.client.gui.setVisibility("toto", "OFF")
+	tp.r.client.gui.setVisibility("hyq_trunk", "OFF")
+	global configs
+	for _, q in enumerate(configs[:-1]):
+		r(q);
+		sleep(pause)	
+	play_trajectory(fullBody,pp,traj)
+	
+
+nodes = ["hyq","Vec_Acceleration","Vec_Velocity"]
+r.client.gui.setCaptureTransform("out.yaml",nodes)
+r(q_init)
+r.client.gui.captureTransformOnRefresh(True)
+displayContactPlanJump(1)
+r.client.gui.captureTransformOnRefresh(False)
+
 #~ 
 #~ trajec +=[traj] 
 
