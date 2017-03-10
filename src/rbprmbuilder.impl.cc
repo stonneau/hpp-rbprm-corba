@@ -761,6 +761,99 @@ namespace hpp {
         }
     }
 
+    hpp::floatSeq* RbprmBuilder::generateGroundContactFixed(const hpp::floatSeq& reference,
+                                                            const hpp::Names_t& contactLimbs) throw (hpp::Error)
+    {
+        if(!fullBodyLoaded_)
+            throw Error ("No full body robot was loaded");
+        try
+        {
+            // first retrieve reference frames
+            model::Configuration_t config = dofArrayToConfig (fullBody_->device_, reference);
+            fullBody_->device_->currentConfiguration(config);
+            fullBody_->device_->computeForwardKinematics();
+            std::vector<std::string> names = stringConversion(contactLimbs);
+            State refState;
+            for(std::vector<std::string>::const_iterator cit = names.begin(); cit !=names.end(); ++cit)
+            {
+                refState.contacts_.insert(std::make_pair(*cit,true));
+                refState.contactNormals_.insert(std::make_pair(*cit,fcl::Vec3f(0.,0.,1.)));
+                rbprm::RbPrmLimbPtr_t limb = fullBody_->GetLimbs().at(*cit);
+                fcl::Matrix3f rotation =  limb->effector_->currentTransformation().getRotation();
+                fcl::Vec3f position = limb->effector_->currentTransformation().getTranslation();
+                refState.contactRotation_.insert(std::make_pair(*cit,rotation));
+                refState.contactPositions_.insert(std::make_pair(*cit,position));
+            }
+
+            fcl::Vec3f z(0,0,1);
+            ValidationReportPtr_t report = ValidationReportPtr_t(new CollisionValidationReport);
+
+            core::DevicePtr_t device = fullBody_->device_;
+            core::BasicConfigurationShooterPtr_t  shooter = core::BasicConfigurationShooter::create(fullBody_->device_);
+
+            core::ConfigProjectorPtr_t proj = core::ConfigProjector::create(device,"proj", 1e-4, 40);
+            //hpp::tools::LockJointRec(limb->limb_->name(), body->device_->rootJoint(), proj);
+            for(std::vector<std::string>::const_iterator cit = names.begin(); cit !=names.end(); ++cit)
+            {
+                const fcl::Vec3f& ppos  = refState.contactPositions_.at(*cit);
+                RbPrmLimbPtr_t limb = fullBody_->GetLimbs().at(*cit);
+                JointPtr_t effectorJoint = device->getJointByName(limb->effector_->name());
+                proj->add(core::NumericalConstraint::create (
+                                        constraints::deprecated::Position::create("",device,
+                                                                      effectorJoint,fcl::Vec3f(0,0,0), ppos)));
+                std::vector<bool> rotConstraints;
+                rotConstraints.push_back(true);rotConstraints.push_back(true);rotConstraints.push_back(true);
+                if(limb->contactType_ == hpp::rbprm::_6_DOF)
+                {
+                    const fcl::Matrix3f& rotation = refState.contactRotation_.at(*cit);
+                    proj->add(core::NumericalConstraint::create (constraints::deprecated::Orientation::create("", device,
+                                                                                      effectorJoint,
+                                                                                      rotation,
+                                                                                      rotConstraints)));
+                }
+            }
+
+            for(int i =0; i< 1000; ++i)
+            {
+                ConfigurationPtr_t configptr = shooter->shoot();
+                Configuration_t config = *configptr;
+                if(proj->apply(config) && config[2]> 0.3)
+                {
+                    if(problemSolver_->problem()->configValidations()->validate(config,report))
+                    {
+                        State tmp;
+                        for(std::vector<std::string>::const_iterator cit = names.begin(); cit !=names.end(); ++cit)
+                        {
+                            std::string limbId = *cit;
+                            rbprm::RbPrmLimbPtr_t limb = fullBody_->GetLimbs().at(*cit);
+                            tmp.contacts_[limbId] = true;
+                            tmp.contactPositions_[limbId] = limb->effector_->currentTransformation().getTranslation();
+                            tmp.contactRotation_[limbId] = limb->effector_->currentTransformation().getRotation();
+                            tmp.contactNormals_[limbId] = z;
+                            tmp.configuration_ = config;
+                            ++tmp.nbContacts;
+                        }
+                        if(stability::IsStable(fullBody_,tmp)>=0)
+                        {
+                            //config[0]=0;
+                            //config[1]=0;
+                            hpp::floatSeq* dofArray = new hpp::floatSeq();
+                            dofArray->length(_CORBA_ULong(config.rows()));
+                            for(std::size_t j=0; j< config.rows(); j++)
+                            {
+                              (*dofArray)[(_CORBA_ULong)j] = config [j];
+                            }
+                            return dofArray;
+                        }
+                    }
+                }
+            }
+            throw (std::runtime_error("could not generate contact configuration after 1000 trials"));
+        } catch (const std::exception& exc) {
+        throw hpp::Error (exc.what ());
+        }
+    }
+
     hpp::floatSeq* RbprmBuilder::getContactSamplesIds(const char* limbname,
                                         const hpp::floatSeq& configuration,
                                         const hpp::floatSeq& direction) throw (hpp::Error)

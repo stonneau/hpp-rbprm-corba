@@ -132,6 +132,9 @@ namespace hpp {
 
         virtual hpp::floatSeq* generateGroundContact(const hpp::Names_t& contactLimbs) throw (hpp::Error);
 
+        virtual hpp::floatSeq* generateGroundContactFixed(const hpp::floatSeq& reference,
+                                                          const hpp::Names_t& contactLimbs) throw (hpp::Error);
+
         virtual hpp::floatSeq* getContactSamplesIds(const char* limb,
                                                    const hpp::floatSeq& configuration,
                                                    const hpp::floatSeq& direction) throw (hpp::Error);

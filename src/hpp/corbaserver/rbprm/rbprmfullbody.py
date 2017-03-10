@@ -210,6 +210,12 @@ class FullBody (object):
     def generateGroundContact(self, contactLimbs):
 		return self.client.rbprm.rbprm.generateGroundContact(contactLimbs)
 		
+	## Generate an autocollision free configuration with limbs in contact with the ground
+    # \param contactLimbs name of the limbs to project in contact
+    # \return a sampled contact configuration
+    def generateGroundContactFixed(self, q_ref, contactLimbs):
+		return self.client.rbprm.rbprm.generateGroundContactFixed(q_ref, contactLimbs)
+		
 	## Create a state and push it to the state array
 	# \param q configuration
 	# \param names list of effectors in contact
