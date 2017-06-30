@@ -1872,6 +1872,13 @@ assert(s2 == s1 +1);
         return res;
     }
 
+    void RbprmBuilder::setReferenceConfig(const hpp::floatSeq& referenceConfig) throw (hpp::Error){
+          if(!fullBodyLoaded_)
+            throw Error ("No full body robot was loaded");
+          model::ConfigurationPtr_t config(new Configuration_t(dofArrayToConfig (fullBody()->device_, referenceConfig)));
+          fullBody()->referenceConfig(config);
+        }
+
     hpp::floatSeq* RbprmBuilder::rrt(t_rrt functor,  double state1, double state2,
                                     unsigned short cT1, unsigned short cT2, unsigned short cT3,
                                     unsigned short numOptimizations)  throw (hpp::Error)

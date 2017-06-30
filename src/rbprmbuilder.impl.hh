@@ -160,6 +160,7 @@ namespace hpp {
         virtual void boundSO3(const hpp::floatSeq& limitszyx) throw (hpp::Error);
 
 
+        virtual void setReferenceConfig(const hpp::floatSeq &referenceConfig) throw (hpp::Error);
         virtual hpp::floatSeq* getSampleConfig(const char* limb, unsigned short sampleId) throw (hpp::Error);
         virtual hpp::floatSeq* getSamplePosition(const char* limb, unsigned short sampleId) throw (hpp::Error);
         virtual hpp::floatSeqSeq* getEffectorPosition(const char* limb, const hpp::floatSeq& configuration) throw (hpp::Error);
