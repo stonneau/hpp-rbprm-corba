@@ -655,6 +655,9 @@ class FullBody (object):
      def setRefConfig(self, targetCom):
           return self.client.rbprm.rbprm.setRefConfig(targetCom)     > 0
           
+     def setReferenceConfig(self, targetCom):
+          return self.client.rbprm.rbprm.setReferenceConfig(targetCom) 
+          
      ## Given start and goal states
      #  generate a contact sequence over a list of configurations
      #
