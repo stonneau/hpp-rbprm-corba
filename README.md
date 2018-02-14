@@ -9,8 +9,11 @@ hpp-rbprm-corba implements python bindings for hpp-rbprm, and presents a few exa
 Please refer to this [link](https://github.com/stonneau/hpp-rbprm) for information on hpp-rbprm.
 
 ##Installation on ubuntu-14.04 64 bit with ros-indigo
+To install hpp-rbprm-corba automatically:
 
-To install hpp-rbprm-corba:
+  1. Follow the instructions at https://humanoid-path-planner.github.io/hpp-doc/download.html
+
+To install hpp-rbprm-corba manually:
 
   1. Install HPP-RBPRM and its dependencies
 	- see https://github.com/stonneau/hpp-rbprm
