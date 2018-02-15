@@ -12,7 +12,7 @@ Please refer to this [link](https://github.com/stonneau/hpp-rbprm) for informati
 
 To install hpp-rbprm-corba automatically:
 
-  1. Follow the instructions at https://humanoid-path-planner.github.io/hpp-doc/download.html
+  1. Go to https://humanoid-path-planner.github.io/hpp-doc/download.html and choose the rbprm installer.
 
 To install hpp-rbprm-corba manually:
 
