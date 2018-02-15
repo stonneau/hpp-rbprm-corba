@@ -39,7 +39,7 @@ To install hpp-rbprm-corba manually:
 
 ##Example
 
-  To see the planner in action, two examples from our IJRR submission with HyQ are available. Examples with HRP-2 are also provided,
+  To see the planner in action, two examples from our TRO paper with HyQ are available. Examples with HRP-2 are also provided,
   though they can only be executed if you have access to HRP-2 model.
 
 
