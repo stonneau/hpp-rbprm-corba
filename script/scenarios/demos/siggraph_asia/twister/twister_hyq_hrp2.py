@@ -318,6 +318,7 @@ leanTargets = computeAffordanceCentroids(tp.afftool, ["Support", 'Lean'])
 
 a = suppTargets
 
+
 def setupHrp2():
     switch_context(0)
     #~ q_init =  [0.8728886120451924,
@@ -580,6 +581,115 @@ def plc(ctx = 0, iid = None):
 
 def go():
     return go0(states, mu=0.6,num_optim=2, use_kin = context == 0)
+
+from gen_data_from_rbprm import *
+
+
+def getClosestTarget(ePos):
+    aE = array(ePos)
+    minDist = 10000
+    current = None
+    global suppTargets
+    for el in suppTargets:
+        d = norm(array(el[0]) - aE)
+        if (d < minDist):
+            current = el[:]
+            minDist = d
+    return current
+    
+    
+def checkDynamic(com,state, ddcom = array([0.,0.,0.])):
+    #~ com = array(state.getCenterOfMass())
+    #~ H, h = state.getContactCone(0.6)  
+    ps = state.getContactPosAndNormals()
+    p = ps[0][0]
+    N = [getClosestTarget(el)[1]  for el in p]
+    H = compute_CWC(p, N, state.fullBody.client.basic.robot.getMass(), mu = 0.9, simplify_cones = False)
+    c = com 
+    print "ddcom", ddcom
+    w = compute_w(c, ddcom)       
+    if(H.dot( w )<= 50).all():
+       return True
+    else:
+        return False
+
+def getCom(config):
+    r(config)
+    return fullBody.client.basic.robot.getCenterOfMass()
+
+from hpp.corbaserver.rbprm.state_alg  import computeIntermediateState, isContactCreated
+def getStatesInterm(s1,s2, configs):
+    sInt = computeIntermediateState(s1,s2)
+    #get moving limb
+    mLimb = list(set(s1.getLimbsInContact()) - set(sInt.getLimbsInContact()))
+    if len(mLimb) == 0:
+        #~ print "no changes"
+        return [s1 for _ in range(len(configs))]
+    mLimb = mLimb[0]
+    #find when limb is moving
+    stemp = State(fullBody,q=s1.q(), limbsIncontact = s1.getLimbsInContact())
+    acc = 0.
+    posInit =array(s1.getContactPosAndNormalsForLimb(mLimb)[0][0][0])
+    posEnd = array(s2.getContactPosAndNormalsForLimb(mLimb)[0][0][0])
+    currentState = s1
+    takeoff = False
+    land = False
+    res = []
+    for q in configs:
+        stemp.setQ(q)
+        #~ print "effector pos ", mLimb
+        #~ print "effector pos ", array(stemp.getEffectorPosition(mLimb)[0])
+        if (not takeoff):
+            if(norm(posInit - array(stemp.getEffectorPosition(mLimb)[0])) > 0.05):
+                #~ print "takeoff "
+                takeoff = True
+                currentState = sInt
+        elif not land:
+            if(norm(posEnd - array(stemp.getEffectorPosition(mLimb)[0])) < 0.05):
+                #~ print "landing "
+                land = True
+                currentState = s2
+        #~ print "sid ", currentState.sId
+        res +=[currentState]
+    return res
+            
+
+
+def getAllEqDyn(first = 0, second = 1, dyn = False):
+    coms = []
+    sc(0);r(states[0].q());sc(1);r(states[0].q())
+    global path
+    sc(first)
+    pIds = [i for i in range(len(path))]
+    cs = [item for sublist in [[[first,i],[second,i]] for i  in [j for j in range(len(path))]] for item in sublist]
+    i = 0
+    for ctx, pId in cs:   
+        #~ if ctx ==  0:   
+        sc(ctx) 
+        s1 = states[pId]       
+        s2 = states[pId+1]
+        newCom = [getCom(config) for config in  path[pId]]
+        statesss = getStatesInterm(s1,s2, path[pId])
+        if dyn:
+            dc  = [24.*(array(newCom[i+1])-array(newCom[i])) for i in  range(len(newCom)-1)]
+            ddc = [array(dc[i+1])-array(dc[i]) for i in  range(len(dc)-1)]
+            #~ print "dyn on", ddc
+            eq = [checkDynamic(newCom[i], statesss[i], ddc[i])  for i in  range(len(ddc))]
+        else: #quasi static
+            eq = [checkDynamic(newCom[i], statesss[i], array([0.,0.,0.])) for i in  range(len(newCom))]
+        coms += [eq]
+    return coms
+    
+#~ b = flatten(getAllEqDyn(dyn = False))
+#~ b2 = flatten(getAllEqDyn(dyn = True))
+#~ c = [el for el in b if el == False]
+#~ c2 = [el for el in b2 if el == False]
+#~ if(len(c2) < len(c)):
+    #~ b = b2
+#~ fname = "validity_twister_1"
+#~ f = open(fname, "w")
+#~ dump(b,f)
+#~ f.close()
     
 def plall(first = 0, second = 1):
     sc(0);r(states[0].q());sc(1);r(states[0].q())
