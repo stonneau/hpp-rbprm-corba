@@ -612,6 +612,22 @@ def checkDynamic(com,state, ddcom = array([0.,0.,0.])):
        return True
     else:
         return False
+        
+def checkDynamicOld(com,state, ddcom = array([0.,0.,0.])):    
+    #~ for contact in state.getLimbsInContact()
+        #~ fullBody..client.rbprm.rbprm.addNewContact    
+    ps = state.getContactPosAndNormals()
+    p = ps[0][0]
+    N = [getClosestTarget(el)[1]  for el in p]
+    initQ = state.q()[:]
+    for l in state.getLimbsInContact():
+        ps2= state.getContactPosAndNormalsForLimb(l)
+        print "ps2 ", ps2
+        print "ps2 ", ps2[0][0][0]
+        print "ps2 ", ps2[1][0][0]
+        addNewContact(state, l, ps2[0][0][0], ps2[1][0][0], num_max_sample = 100)
+    state.setQ(initQ)
+    return fullBody.isStateBalanced(state.sId, -20)
 
 def getCom(config):
     r(config)
@@ -664,20 +680,20 @@ def getAllEqDyn(first = 0, second = 1, dyn = False):
     cs = [item for sublist in [[[first,i],[second,i]] for i  in [j for j in range(len(path))]] for item in sublist]
     i = 0
     for ctx, pId in cs:   
-        #~ if ctx ==  0:   
-        sc(ctx) 
-        s1 = states[pId]       
-        s2 = states[pId+1]
-        newCom = [getCom(config) for config in  path[pId]]
-        statesss = getStatesInterm(s1,s2, path[pId])
-        if dyn:
-            dc  = [24.*(array(newCom[i+1])-array(newCom[i])) for i in  range(len(newCom)-1)]
-            ddc = [array(dc[i+1])-array(dc[i]) for i in  range(len(dc)-1)]
-            #~ print "dyn on", ddc
-            eq = [checkDynamic(newCom[i], statesss[i], ddc[i])  for i in  range(len(ddc))]
-        else: #quasi static
-            eq = [checkDynamic(newCom[i], statesss[i], array([0.,0.,0.])) for i in  range(len(newCom))]
-        coms += [eq]
+        if ctx !=  5:   
+            sc(ctx) 
+            s1 = states[pId]       
+            s2 = states[pId+1]
+            newCom = [getCom(config) for config in  path[pId]]
+            statesss = getStatesInterm(s1,s2, path[pId])
+            if dyn:
+                dc  = [24.*(array(newCom[i+1])-array(newCom[i])) for i in  range(len(newCom)-1)]
+                ddc = [array(dc[i+1])-array(dc[i]) for i in  range(len(dc)-1)]
+                #~ print "dyn on", ddc
+                eq = [checkDynamic(newCom[i], statesss[i], ddc[i])  for i in  range(len(ddc))]
+            else: #quasi static
+                eq = [checkDynamic(newCom[i], statesss[i], array([0.,0.,0.])) or checkDynamicOld(newCom[i],statesss[i], ddcom = array([0.,0.,0.])) for i in  range(len(newCom))]
+            coms += [eq]
     return coms
     
 #~ b = flatten(getAllEqDyn(dyn = False))
@@ -686,7 +702,7 @@ def getAllEqDyn(first = 0, second = 1, dyn = False):
 #~ c2 = [el for el in b2 if el == False]
 #~ if(len(c2) < len(c)):
     #~ b = b2
-#~ fname = "validity_twister_1"
+#~ fname = "validity_chair_1"
 #~ f = open(fname, "w")
 #~ dump(b,f)
 #~ f.close()
@@ -1034,3 +1050,10 @@ lc();
     #~ onepath(i,1,4,effector=True,mu=0.6)
     #~ sac()
     #~ 
+b = flatten(getAllEqDyn(dyn = False))
+#~ b2 = flatten(getAllEqDyn(dyn = True))
+c = [el for el in b if el == False]
+fname = "validity_twister"
+f = open(fname, "w")
+dump(b,f)
+f.close()
