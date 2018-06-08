@@ -43,13 +43,10 @@ To install hpp-rbprm-corba manually:
   though they can only be executed if you have access to HRP-2 model.
 
 
-  - First of all, retrieve and build the HyQ model from its github repository:
-	https://github.com/iit-DLSLab/hyq-description
+  - First of all, retrieve and build the former HyQ model from this address:
+	https://cloud.laas.fr/index.php/s/ydRq3DoBz2LYMLS
 
-
-    ```$ rosrun xacro xacro.py  hyq_description/robots/hyq_model.urdf.xacro -o  hyq.urdf```
-
-  - Make sure to install hyq.urdf in $HPP_DEVEL_DIR/install/share/hpp-rbprm-corba/
+You shoud unzip it in $DEVEL_DIR/install/share/hyq_description/
 
   - The planning is decomposed in two phases / scripts. First, a root path is computed (\*_path.py files). Then, the contacts are generated along the computed path (\*_interp.py files). The scripts are located in the folder /scripts/demos.
 
