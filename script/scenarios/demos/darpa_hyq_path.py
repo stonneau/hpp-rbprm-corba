@@ -122,9 +122,8 @@ def to_ineq(a,b,y_r,z_r):
 # y le poids initial alloue a la largeur (si la distance ab vaut 1, initialement la largeur vaut y)
 # z le poids initial alloue a la hauteur (si la distance ab vaut 1, initialement la hauteur vaut y)
 # sizeObject dimension de securite de l'effecteur
-def large_col_free_box(a,b,y = 0.5 ,z = 0.2, sizeObject = 0.05):
+def large_col_free_box(a,b,y = 0.5 ,z = 0.2, sizeObject = 0.05, margin = 0.):
         # margin distance is not so good, better expand and then reduce box
-        margin = 0.
         # d abord o nessaie de trouver une boite sans collsion
         collision = True
         a_r = array(a); b_r = array(b); y_r = y; z_r = z
@@ -160,6 +159,44 @@ def large_col_free_box(a,b,y = 0.5 ,z = 0.2, sizeObject = 0.05):
         # now we have reached maximum uniform scaling, so we play a bit along each axis.
         eps = 0.05
         
+         
+        
+        maxiter = 20
+        collision = False
+        while(not collision and maxiter>0):
+                maxiter =  maxiter -1;
+                # start with b
+                tmp_b_r = b_r + x_dir * eps
+                # adapt scaling of y and z
+                x_len = norm(b_r - a_r)
+                tmp_y_r = (x_len * y_r) / (x_len + eps)
+                tmp_z_r = (x_len * z_r) / (x_len + eps)
+                distance = rbprmBuilder.clientRbprm.rbprm.isBoxAroundAxisCollisionFree(a_r.tolist(),tmp_b_r.tolist(),[tmp_y_r,tmp_z_r],margin)                        
+                collision = not distance > 0
+                if collision:
+                        break
+                else:
+                        b_r = tmp_b_r[:]
+                        y_r = tmp_y_r     
+                        z_r = tmp_z_r    
+        maxiter = 20
+        collision = False
+        while(not collision  and maxiter>0):
+                maxiter =  maxiter -1;
+                # start with a
+                tmp_a_r = a_r - x_dir * eps
+                x_len = norm(b_r - a_r)
+                tmp_y_r = (x_len * y_r) / (x_len + eps)
+                tmp_z_r = (x_len * z_r) / (x_len + eps)
+                distance = rbprmBuilder.clientRbprm.rbprm.isBoxAroundAxisCollisionFree(tmp_a_r.tolist(),b_r.tolist(),[tmp_y_r,tmp_z_r],margin)                        
+                collision = not distance > 0
+                if collision:
+                        break
+                else:
+                        a_r = tmp_a_r[:]  
+                        y_r = tmp_y_r     
+                        z_r = tmp_z_r       
+                        
         
         maxiter = 50
         collision = False
@@ -187,32 +224,6 @@ def large_col_free_box(a,b,y = 0.5 ,z = 0.2, sizeObject = 0.05):
                 else:
                         z_r = tmp_z_r     
         
-        maxiter = 20
-        collision = False
-        while(not collision and maxiter>0):
-                maxiter =  maxiter -1;
-                # start with b
-                tmp_b_r = b_r + x_dir * eps
-                distance = rbprmBuilder.clientRbprm.rbprm.isBoxAroundAxisCollisionFree(a_r.tolist(),tmp_b_r.tolist(),[y_r,z_r],margin)                        
-                collision = not distance > 0
-                if collision:
-                        break
-                else:
-                        b_r = tmp_b_r[:]
-        
-        maxiter = 20
-        collision = False
-        while(not collision  and maxiter>0):
-                maxiter =  maxiter -1;
-                # start with a
-                tmp_a_r = a_r - x_dir * eps
-                distance = rbprmBuilder.clientRbprm.rbprm.isBoxAroundAxisCollisionFree(tmp_a_r.tolist(),b_r.tolist(),[y_r,z_r],margin)                        
-                collision = not distance > 0
-                if collision:
-                        break
-                else:
-                        a_r = tmp_a_r[:]       
-        
         #removing offset
         
         a_r = (a_r + x_dir*sizeObject/2).tolist()
@@ -221,6 +232,6 @@ def large_col_free_box(a,b,y = 0.5 ,z = 0.2, sizeObject = 0.05):
         return (a_r, b_r, y_r, z_r), to_ineq(a_r, b_r, y_r, z_r)
         
 ##############################################" TEST ##################################""
-(a, b, y, z),(H,h) = large_col_free_box([0.5,0.,1.1],[0.,0.,0.4],.1,.1)
+(a, b, y, z),(H,h) = large_col_free_box([0.5,0.,1.1],[0.,0.,0.4],.1,.1, 0.)
 display_box(gui,a,b,y,z)
 gui.refresh()
