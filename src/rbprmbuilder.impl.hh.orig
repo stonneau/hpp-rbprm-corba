@@ -28,6 +28,7 @@
 # include <hpp/rbprm/sampling/analysis.hh>
 # include <hpp/core/collision-path-validation-report.hh>
 # include <hpp/core/problem-solver.hh>
+# include <hpp/core/discretized-collision-checking.hh>
 # include <hpp/core/straight-path.hh>
 # include <hpp/core/problem.hh>
 #include <hpp/corbaserver/affordance/server.hh>
@@ -65,7 +66,6 @@ namespace hpp {
             if(!so3Bounds_.empty())
                 shooter->BoundSO3(so3Bounds_);
             shooter->sampleExtraDOF(problem.getParameter("ConfigurationShooter/sampleExtraDOF").boolValue());
-            shooter->ratioWeighted(problem.getParameter("RbprmShooter/ratioWeighted").floatValue ());
             return shooter;
         }
 
@@ -108,8 +108,18 @@ namespace hpp {
           else
             rectangularContact = 0;
           mass = robot->mass();
+<<<<<<< Updated upstream
           mu = problemSolver_->problem()->getParameter (std::string("DynamicPlanner/friction")).floatValue();
           hppDout(notice,"mu define in python : "<<mu);
+=======
+          try {
+            mu = problemSolver_->problem()->getParameter ("friction").floatValue();
+            hppDout(notice,"mu define in python : "<<mu);
+          } catch (const std::exception& e) {
+            mu= 0.5;
+            hppDout(notice,"mu not defined, take : "<<mu<<" as default.");
+          }
+>>>>>>> Stashed changes
           DynamicValidationPtr_t dynamicVal = DynamicValidation::create(rectangularContact,sizeFootX,sizeFootY,mass,mu,robot);
           collisionChecking->addDynamicValidator(dynamicVal);
 
@@ -359,8 +369,7 @@ namespace hpp {
         virtual hpp::floatSeq *isReachableFromState(unsigned short stateFrom,unsigned short stateTo)throw (hpp::Error);
         virtual hpp::floatSeq* isDynamicallyReachableFromState(unsigned short stateFrom, unsigned short stateTo, bool addPathPerPhase, const hpp::floatSeq &timings, short numPointPerPhase )throw (hpp::Error);
 
-        virtual double isBoxAroundAxisCollisionFree(const hpp::floatSeq &A, const hpp::floatSeq &B, const hpp::floatSeq &weights,const double margin)throw (hpp::Error);
-        virtual hpp::floatSeq* rotationQuaternion(const hpp::floatSeq& from, const hpp::floatSeq& to);
+
         void selectFullBody (const char* name) throw (hpp::Error)
         {
           std::string psName (name);

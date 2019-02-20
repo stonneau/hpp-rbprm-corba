@@ -779,6 +779,9 @@ module hpp
 
     floatSeq isDynamicallyReachableFromState(in unsigned short stateFrom, in unsigned short stateTo,in boolean addPathPerPhase, in floatSeq timings,in short numPointsPerPhase)raises (Error);
 
+    double isBoxAroundAxisCollisionFree(in floatSeq A, in floatSeq B, in floatSeq weights, in double margin)raises (Error);
+
+    floatSeq rotationQuaternion(in floatSeq from, in floatSeq to)raises (Error);
 
   }; // interface Robot
   }; // module rbprm

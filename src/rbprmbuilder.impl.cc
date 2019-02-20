@@ -50,6 +50,13 @@
 #include <hpp/rbprm/sampling/heuristic-tools.hh>
 #include <hpp/rbprm/contact_generation/reachability.hh>
 #include <hpp/pinocchio/urdf/util.hh>
+
+#include <hpp/fcl/fwd.hh>
+#include <hpp/fcl/shape/geometric_shapes.h>
+#include <hpp/fcl/BVH/BVH_model.h>
+#include <hpp/fcl/collision.h>
+#include <hpp/fcl/collision_data.h>
+
 #ifdef PROFILE
     #include "hpp/rbprm/rbprm-profiler.hh"
 #endif
@@ -3446,6 +3453,74 @@ namespace hpp {
             return new hpp::floatSeq();
     }
 
+    fcl::CollisionObjectPtr_t MeshObstacleBox(fcl::Vec3f& a, fcl::Vec3f& b, pinocchio::ConfigurationIn_t weights)
+    {
+        double x, y, z;
+        double normba =(b-a).norm();
+        x = normba / 2.;
+        y = weights(0) * normba;
+        z = weights(1) * normba;
+        hpp::fcl::BVHModel<fcl::OBBRSS>* m1 = new hpp::fcl::BVHModel<fcl::OBBRSS>;
+        std::vector<fcl::Vec3f> p1;
+        p1.push_back(fcl::Vec3f(x,-y,-z));p1.push_back(fcl::Vec3f(x,-y,z));p1.push_back(fcl::Vec3f(-x,-y,z));p1.push_back(fcl::Vec3f(-x,-y,-z));
+        p1.push_back(fcl::Vec3f(x,y,-z));p1.push_back(fcl::Vec3f(x,y,z));p1.push_back(fcl::Vec3f(-x,y,z));p1.push_back(fcl::Vec3f(-x,y,-z));
+        std::vector<fcl::Triangle> t1;
+        t1.push_back(fcl::Triangle(1,2,3));t1.push_back(fcl::Triangle(7,6,5));t1.push_back(fcl::Triangle(4,5,1));
+        t1.push_back(fcl::Triangle(5,6,2));t1.push_back(fcl::Triangle(2,6,7));t1.push_back(fcl::Triangle(0,3,7));
+        t1.push_back(fcl::Triangle(0,1,3));t1.push_back(fcl::Triangle(4,7,5));t1.push_back(fcl::Triangle(0,4,1));
+        t1.push_back(fcl::Triangle(1,5,2));t1.push_back(fcl::Triangle(3,2,7));t1.push_back(fcl::Triangle(4,0,7));
+        m1->beginModel();
+        m1->addSubModel(p1, t1);
+        m1->endModel();
+        hpp::fcl::CollisionGeometryPtr_t colGeom (m1);
+        fcl::Vec3f tr (a + (b-a)/2);
+        const fcl::Matrix3f alignRotation = tools::GetRotationMatrix(Vector3(1.,0.,0.),(b-a).normalized());
+        return hpp::fcl::CollisionObjectPtr_t( new hpp::fcl::CollisionObject(colGeom, alignRotation, tr));
+    }
+
+    //weights is height, width (for now symmetric)
+    // return positive value if collision free
+    double RbprmBuilder::isBoxAroundAxisCollisionFree
+    (const hpp::floatSeq &A, const hpp::floatSeq &B, const hpp::floatSeq &weights, const double margin)throw (hpp::Error)
+    {
+        double lowerBound = 10000;
+        Vector3 a = dofArrayToConfig (3, A);
+        Vector3 b = dofArrayToConfig (3, B);
+        pinocchio::Configuration_t we = dofArrayToConfig (2, weights);
+        fcl::CollisionObjectPtr_t colObj = MeshObstacleBox(a,b,we);
+         const ObjectStdVector_t& obs = problemSolver()->collisionObstacles();
+         for (ObjectStdVector_t::const_iterator cit = obs.begin(); cit != obs.end(); ++cit)
+         {
+             fcl::CollisionRequest r(fcl::CONTACT | fcl::DISTANCE_LOWER_BOUND,1);
+             r.security_margin =margin;
+             fcl::CollisionResult res;
+             FclConstCollisionObjectPtr_t obj = (*cit)->fcl();
+             if (fcl::collide(colObj.get() ,obj ,r,res) > 0 )
+             {
+                 return -std::fabs(res.getContact(0).penetration_depth);
+             }
+             else
+             {
+                 lowerBound = std::min(std::fabs(res.distance_lower_bound), lowerBound);
+             }
+         }
+         return lowerBound;
+    }
+
+    hpp::floatSeq* RbprmBuilder::rotationQuaternion(const hpp::floatSeq& from, const hpp::floatSeq& to)
+    {
+        Vector3 fr = dofArrayToConfig (3, from);
+        Vector3 t = dofArrayToConfig (3, to);
+        Eigen::Quaterniond quat; quat.setFromTwoVectors(fr, t);
+        // convert vector of int to floatSeq :
+        hpp::floatSeq* dofArray = new hpp::floatSeq();
+        dofArray->length(4);
+        for(std::size_t i=0; i< 4; ++i)
+        {
+          (*dofArray)[(_CORBA_ULong)i] = (CORBA::Double)(quat.coeffs()[i]);
+        }
+        return dofArray;
+    }
 
     } // namespace impl
   } // namespace rbprm

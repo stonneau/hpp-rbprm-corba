@@ -52,35 +52,175 @@ ps.client.problem.selectConfigurationShooter("RbprmShooter")
 ps.client.problem.selectPathValidation("RbprmPathValidation",0.05)
 
 # Solve the problem
-t = ps.solve ()
+#~ t = ps.solve ()
 #~ t = 0.
-if isinstance(t, list):
-	t = t[0]* 3600000 + t[1] * 60000 + t[2] * 1000 + t[3]	
 
-print "computation time for root path ", t
+from numpy import array
+from numpy.linalg import norm
+import quaternion
+from scipy.spatial import ConvexHull
 
-# Playing the computed path
-from hpp.gepetto import PathPlayer
-pp = PathPlayer (v)
-
-q_far = q_init [::]
-q_far [0:3] = [-2, -3, 0.6]; 
-v(q_far)
-
-for i in range(1,10):
-	rbprmBuilder.client.problem.optimizePath(i)
+##############################################" affichage ##################################""
+boxId = 0
+scene = "boxes"
+def init_scene(gui, winId): #  v.client.gui
+        boxid = gui.createScene(scene)
+        gui.addSceneToWindow(scene,winId)
+        gui.refresh()
+      
+def rot_quat_x(a):
+        x = [1.,0.,0.]
+        return rbprmBuilder.clientRbprm.rbprm.rotationQuaternion(x,a)
         
-#~ pp(9)
-	
+def rot_mat_x(a):
+        x = [1.,0.,0.]
+        q = rbprmBuilder.clientRbprm.rbprm.rotationQuaternion(x,a)
+        q = quaternion.Quaternion(q[-1],q[0],q[1],q[2])
+        return q.toRotationMatrix()
+        
+        
 
-from hpp.corbaserver import Client
- #DEMO code to play root path and final contact plan
-cl = Client()
-cl.problem.selectProblem("rbprm_path")
-rbprmBuilder2 = Robot ("toto")
-ps2 = ProblemSolver( rbprmBuilder2 )
-cl.problem.selectProblem("default")
-cl.problem.movePathToProblem(8,"rbprm_path",rbprmBuilder.getAllJointNames()[1:])
-r2 = Viewer (ps2, viewerClient=v.client)
-r2(q_far)
+def display_box(gui,a,b,y,z):
+        global scene
+        global boxId
+        ar_a = array(a)
+        ar_b = array(b)
+        x_len = norm(ar_b - ar_a)
+        x_pos = ar_a + (ar_b  - ar_a) / 2
+        boxname = scene+"/b"+str(boxId); boxId = boxId +1
+        gui.addBox(boxname,x_len/ 2,y*x_len,z*x_len, [1.,0.,0.,1.])
+        config = x_pos.tolist()+rot_quat_x( ((ar_b - ar_a) / x_len).tolist() )
+        gui.applyConfiguration(boxname,config)
+        gui.refresh()
+        
+gui = v.client.gui
+winId = 0
+init_scene(gui, winId)
 
+def to_ineq(a,b,y_r,z_r):
+        a_r = array(a); b_r = array(b);
+        normba = norm(b_r - a_r)
+        x_dir = (b_r - a_r) / normba
+        x_pos = a_r + (b_r  - a_r) / 2
+        
+        x = normba / 2.
+        y = y_r * normba;
+        z = z_r * normba;
+        
+        points = [ [x,-y,z], [x,-y,z], [-x,-y,z], [x,-y,-z], [x,y,-z], [x,y,z], [-x,y,z], [-x,y,-z] ]
+        #transform
+        rot = rot_mat_x(x_dir.tolist())
+        points = [rot.dot(array(el)) + x_pos for el in points]
+        ineq = ConvexHull(points).equations
+        return ineq[:,:-1],-ineq[:,-1]
+          
+        
+
+##############################################" CALCUL ##################################""
+
+# a et b sont les extremites du rrt
+# y le poids initial alloue a la largeur (si la distance ab vaut 1, initialement la largeur vaut y)
+# z le poids initial alloue a la hauteur (si la distance ab vaut 1, initialement la hauteur vaut y)
+# sizeObject dimension de securite de l'effecteur
+def large_col_free_box(a,b,y = 0.5 ,z = 0.2, sizeObject = 0.05):
+        # margin distance is not so good, better expand and then reduce box
+        margin = 0.
+        # d abord o nessaie de trouver une boite sans collsion
+        collision = True
+        a_r = array(a); b_r = array(b); y_r = y; z_r = z
+        x_dir = (b_r - a_r) / norm(b_r - a_r)  
+        distance = 0
+        maxiter = 100
+        while(collision and maxiter > 0):
+                maxiter = maxiter -1
+                distance = rbprmBuilder.clientRbprm.rbprm.isBoxAroundAxisCollisionFree(a_r.tolist(),b_r.tolist(),[y_r,z_r],margin)
+                collision = not distance > 0
+                if(collision):
+                        y_r = y_r* 0.5; z_r = z_r* 0.5 #todo handle penetration to be smarter
+        if collision:
+                print "failed"
+                return -1
+        # now for the largest box possible
+        else:           
+                while(not collision and distance > 0.01 + sizeObject):
+                        #find meaning of distance
+                        x_len = norm(b_r - a_r)
+                        x_dir = (b_r - a_r) / x_len
+                        scale = x_len + (distance) /(2* x_len)
+                        x_pos = a_r + (b_r  - a_r) / 2
+                        tmp_a_r = (x_pos - x_dir * scale * x_len / 2.)
+                        tmp_b_r = (x_pos + x_dir * scale * x_len / 2.)                 
+                        distance = rbprmBuilder.clientRbprm.rbprm.isBoxAroundAxisCollisionFree(tmp_a_r.tolist(),tmp_b_r.tolist(),[y_r,z_r],margin)                        
+                        collision = not distance > 0
+                        if collision:
+                                break
+                        else:
+                                a_r = tmp_a_r[:]
+                                b_r = tmp_b_r[:]
+        # now we have reached maximum uniform scaling, so we play a bit along each axis.
+        eps = 0.05
+        
+        
+        maxiter = 50
+        collision = False
+        while(not collision  and maxiter>0):
+                maxiter =  maxiter -1;
+                # start with a
+                tmp_y_r = y_r + y_r * 0.05
+                distance = rbprmBuilder.clientRbprm.rbprm.isBoxAroundAxisCollisionFree(a_r.tolist(),b_r.tolist(),[tmp_y_r,z_r],margin)                        
+                collision = not distance > 0
+                if collision:
+                        break
+                else:
+                        y_r = tmp_y_r     
+                        
+        maxiter = 50
+        collision = False
+        while(not collision  and maxiter>0):
+                maxiter =  maxiter -1;
+                # start with a
+                tmp_z_r = z_r + z_r * 0.05
+                distance = rbprmBuilder.clientRbprm.rbprm.isBoxAroundAxisCollisionFree(a_r.tolist(),b_r.tolist(),[tmp_y_r,z_r],margin)                        
+                collision = not distance > 0
+                if collision:
+                        break
+                else:
+                        z_r = tmp_z_r     
+        
+        maxiter = 20
+        collision = False
+        while(not collision and maxiter>0):
+                maxiter =  maxiter -1;
+                # start with b
+                tmp_b_r = b_r + x_dir * eps
+                distance = rbprmBuilder.clientRbprm.rbprm.isBoxAroundAxisCollisionFree(a_r.tolist(),tmp_b_r.tolist(),[y_r,z_r],margin)                        
+                collision = not distance > 0
+                if collision:
+                        break
+                else:
+                        b_r = tmp_b_r[:]
+        
+        maxiter = 20
+        collision = False
+        while(not collision  and maxiter>0):
+                maxiter =  maxiter -1;
+                # start with a
+                tmp_a_r = a_r - x_dir * eps
+                distance = rbprmBuilder.clientRbprm.rbprm.isBoxAroundAxisCollisionFree(tmp_a_r.tolist(),b_r.tolist(),[y_r,z_r],margin)                        
+                collision = not distance > 0
+                if collision:
+                        break
+                else:
+                        a_r = tmp_a_r[:]       
+        
+        #removing offset
+        
+        a_r = (a_r + x_dir*sizeObject/2).tolist()
+        b_r = (b_r - x_dir*sizeObject/2).tolist()        
+        
+        return (a_r, b_r, y_r, z_r), to_ineq(a_r, b_r, y_r, z_r)
+        
+##############################################" TEST ##################################""
+(a, b, y, z),(H,h) = large_col_free_box([0.5,0.,1.1],[0.,0.,0.4],.1,.1)
+display_box(gui,a,b,y,z)
+gui.refresh()
