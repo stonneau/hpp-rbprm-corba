@@ -141,7 +141,9 @@ def large_col_free_box(a,b,y = 0.5 ,z = 0.2, sizeObject = 0.05, margin = 0.):
                 return -1
         # now for the largest box possible
         else:           
-                while(not collision and distance > 0.01 + sizeObject):
+                maxiter = 100
+                while(not collision and distance > 0.01 and maxiter > 0):
+                        maxiter = maxiter - 1
                         #find meaning of distance
                         x_len = norm(b_r - a_r)
                         x_dir = (b_r - a_r) / x_len
@@ -149,13 +151,16 @@ def large_col_free_box(a,b,y = 0.5 ,z = 0.2, sizeObject = 0.05, margin = 0.):
                         x_pos = a_r + (b_r  - a_r) / 2
                         tmp_a_r = (x_pos - x_dir * scale * x_len / 2.)
                         tmp_b_r = (x_pos + x_dir * scale * x_len / 2.)                 
-                        distance = rbprmBuilder.clientRbprm.rbprm.isBoxAroundAxisCollisionFree(tmp_a_r.tolist(),tmp_b_r.tolist(),[y_r,z_r],margin)                        
-                        collision = not distance > 0
-                        if collision:
+                        distance2 = rbprmBuilder.clientRbprm.rbprm.isBoxAroundAxisCollisionFree(tmp_a_r.tolist(),tmp_b_r.tolist(),[y_r,z_r],margin)                        
+                        collision = not distance2 > 0
+                        if not collision:
                                 break
-                        else:
+                        else:              
+                                if abs(distance2 - distance) < 0.01 or distance2 > distance:
+                                        break
                                 a_r = tmp_a_r[:]
-                                b_r = tmp_b_r[:]
+                                b_r = tmp_b_r[:]          
+                                distance = distance2
         # now we have reached maximum uniform scaling, so we play a bit along each axis.
         eps = 0.05
         
@@ -233,5 +238,7 @@ def large_col_free_box(a,b,y = 0.5 ,z = 0.2, sizeObject = 0.05, margin = 0.):
         
 ##############################################" TEST ##################################""
 (a, b, y, z),(H,h) = large_col_free_box([0.5,0.,1.1],[0.,0.,0.4],.1,.1, 0.)
+display_box(gui,a,b,y,z)
+(a, b, y, z),(H,h) = large_col_free_box([-1.5,0.,0.6],[-2.,0.,0.6],0.1,0.2, 0.05)
 display_box(gui,a,b,y,z)
 gui.refresh()
