@@ -55,12 +55,29 @@ ps.client.problem.selectPathValidation("RbprmPathValidation",0.05)
 #~ t = ps.solve ()
 #~ t = 0.
 
-from numpy import array
+from numpy import array, zeros
 from numpy.linalg import norm
-import quaternion
 from scipy.spatial import ConvexHull
 
 ##############################################" affichage ##################################""
+
+def toRotationMatrix(q):
+        """
+        Returns a (3*3) array (rotation matrix)
+        representing the same rotation as the (normalized) quaternion.
+        """
+        rm=zeros((3,3))
+        rm[0,0]=1-2*(q[2]**2+q[3]**2)
+        rm[0,1]=2*q[1]*q[2]-2*q[0]*q[3]
+        rm[0,2]=2*q[1]*q[3]+2*q[0]*q[2]
+        rm[1,0]=2*q[1]*q[2]+2*q[0]*q[3]
+        rm[1,1]=1-2*(q[1]**2+q[3]**2)
+        rm[1,2]=2*q[2]*q[3]-2*q[0]*q[1]
+        rm[2,0]=2*q[1]*q[3]-2*q[0]*q[2]
+        rm[2,1]=2*q[2]*q[3]+2*q[0]*q[1]
+        rm[2,2]=1-2*(q[1]**2+q[2]**2)
+        return rm
+
 boxId = 0
 scene = "boxes"
 def init_scene(gui, winId): #  v.client.gui
@@ -75,8 +92,7 @@ def rot_quat_x(a):
 def rot_mat_x(a):
         x = [1.,0.,0.]
         q = rbprmBuilder.clientRbprm.rbprm.rotationQuaternion(x,a)
-        q = quaternion.Quaternion(q[-1],q[0],q[1],q[2])
-        return q.toRotationMatrix()
+        return toRotationMatrix(q)
         
         
 
