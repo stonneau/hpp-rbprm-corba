@@ -76,9 +76,11 @@ v(q_goal)
 v.addLandmark('anymal/base',0.3)
 v(q_init)
 
+z = [0.,0.,1]
+
 # specify the full body configurations as start and goal state of the problem
-fullBody.setStartState(q_init,fullBody.limbs_names)
-fullBody.setEndState(q_goal,fullBody.limbs_names)
+fullBody.setStartState(q_init,fullBody.limbs_names, [z for _ in range(4)])
+fullBody.setEndState(q_goal,fullBody.limbs_names, [z for _ in range(4)])
 
 
 print "Generate contact plan ..."
@@ -93,3 +95,11 @@ print "number of configs :", len(configs)
 fullBody.resetJointsBounds()
 
 
+from hpp.corbaserver.rbprm import rbprmstate
+from hpp.corbaserver.rbprm.rbprmstate import State, StateHelper
+
+sId = 30
+
+s = State(fullBody, sId)
+v(s.q())
+s1, succ = StateHelper.moveAndContact(s,[-0.04,0.,0.],Robot.rLegId)
