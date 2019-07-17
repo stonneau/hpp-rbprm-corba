@@ -95,11 +95,3 @@ print "number of configs :", len(configs)
 fullBody.resetJointsBounds()
 
 
-from hpp.corbaserver.rbprm import rbprmstate
-from hpp.corbaserver.rbprm.rbprmstate import State, StateHelper
-
-sId = 30
-
-s = State(fullBody, sId)
-v(s.q())
-s1, succ = StateHelper.moveAndContact(s,[-0.04,0.,0.],Robot.rLegId)
