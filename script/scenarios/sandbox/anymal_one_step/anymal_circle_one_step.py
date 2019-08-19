@@ -197,7 +197,7 @@ def dispContactPlan(states, step = 0.5):
 
 fsp = sp.FewStepPlanner(tp.cl,tp.ps,tp.rbprmBuilder, fullBody, pathPlayer = tp.pp)
 print "contact start "
-states, cfgs = fsp.interpolateState(0.002,pathId=pId,robustnessTreshold = 1, filterStates = True,quasiStatic=True)
+states, cfgs = fsp.interpolateStates(0.002,pathId=pId,robustnessTreshold = 1, filterStates = True,quasiStatic=True)
 print "contact start "
 
 
@@ -207,22 +207,22 @@ print "contact start "
 
 n_goal = tp.q_goal[:7][:]
 n_goal[0] += 2
-#~ n_goal[1] += 1
+n_goal[1] += 1
 n_goal[3:7] = [0.,0.,0.7071,0.7071]
 
 
 
 n_goal_state = states[-1].q()[:]
 n_goal_state[:7] = n_goal[:]
-fullBody.setStartState(states[-1].q(),[fullBody.rArmId,fullBody.rLegId,fullBody.lArmId,fullBody.lLegId],normals)
+fullBody.setStartStateId(states[-1].sId)
 fullBody.setEndState(n_goal_state, [fullBody.rArmId,fullBody.rLegId,fullBody.lArmId,fullBody.lLegId],normals)
 
 pId= fsp.guidePath(tp.q_goal[:7],n_goal)
-states2, cfgs2 = fsp.interpolateState(0.002,pathId=pId,robustnessTreshold = 1, filterStates = True,quasiStatic=True, erasePreviousStates = False)
+states2, cfgs2 = fsp.interpolateStates(0.002,pathId=pId,robustnessTreshold = 1, filterStates = True,quasiStatic=True, erasePreviousStates = False)
 
 #~ displayContactSequence(v,cfgs2,0.1)
 print "cplan"
-dispContactPlan(states2,0.1)
+#~ dispContactPlan(states2,0.1)
 
 print "end cplan"
 
@@ -231,5 +231,8 @@ fullBody.setStartState(n_goal_state,[fullBody.rArmId,fullBody.rLegId,fullBody.lA
 fullBody.setEndState(states[-1].q(), [fullBody.rArmId,fullBody.rLegId,fullBody.lArmId,fullBody.lLegId],normals)
 
 print "new state cplan"
-dispContactPlan(states2,0.1)
-states3, cfgs3 = fsp.interpolateState(0.002,pathId=pId,robustnessTreshold = 1, filterStates = True,quasiStatic=True, erasePreviousStates = False)
+#~ dispContactPlan(states2,0.1)
+states3, cfgs3 = fsp.interpolateStates(0.002,pathId=pId,robustnessTreshold = 1, filterStates = True,quasiStatic=True, erasePreviousStates = False)
+
+n_goal[1] -= 3
+states4, cfgs4 = fsp.goToQuasiStatic(states3[-1],n_goal)
