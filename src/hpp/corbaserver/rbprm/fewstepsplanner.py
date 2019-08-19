@@ -24,19 +24,31 @@ from numpy import array
 from hpp.corbaserver.rbprm import rbprmstate
 from hpp.corbaserver.rbprm.rbprmstate import State
 
-def interpolateState(fullBody, stepsize, pathId = 1, robustnessTreshold = 0, filterStates = False, testReachability = True, quasiStatic = False, erasePreviousStates = False):
+def _interpolateState(ps, fullBody, stepsize, pathId, robustnessTreshold = 0, filterStates = False, testReachability = True, quasiStatic = False, erasePreviousStates = True):
   if(filterStates):
         filt = 1
   else:
         filt = 0
-  configs = fullBody.clientRbprm.rbprm.interpolate(stepsize, pathId, robustnessTreshold, filt, testReachability, quasiStatic, erasePreviousStates)
+        
+  #discretize path
+  totalLength = ps.pathLength(pathId)
+  configsPlan = []; step = 0.
+  configSize = fullBody.getConfigSize() - len(ps.configAtParam(pathId,0.))
+  z = [0. for _ in range(configSize) ]
+  while step < totalLength:
+    configsPlan += [ps.configAtParam(pathId,step) + z[:]]
+    step += stepsize
+  configsPlan += [ps.configAtParam(pathId,totalLength)+ z[:]]
+    
+  configs = fullBody.clientRbprm.rbprm.interpolateConfigs(configsPlan, robustnessTreshold, filt, testReachability, quasiStatic, erasePreviousStates)
   firstStateId = fullBody.clientRbprm.rbprm.getNumStates() - len(configs)
-  return [ State(fullBody, i) for i in range(firstStateId, firstStateId + len(configs)) ]
+  return [ State(fullBody, i) for i in range(firstStateId, firstStateId + len(configs)) ], configs
           
 
-def guidePath(problemSolver, fromPos, toPos):
+def _guidePath(problemSolver, fromPos, toPos):
   ps = problemSolver
   ps.setInitialConfig (fromPos)
+  ps.resetGoalConfigs()
   ps.addGoalConfig(toPos)
   ps.solve ()
   return ps.numberPaths() - 1
@@ -72,12 +84,15 @@ class FewStepPlanner(object):
     return res
     
   def guidePath(self, fromPos, toPos):
-    pId =  self._actInContext(self.planContext,guidePath,self.problemSolver, fromPos, toPos)
+    pId =  self._actInContext(self.planContext,_guidePath,self.problemSolver, fromPos, toPos)
     self.setPlanningContext()
     names =  self.rbprmBuilder.getAllJointNames()[1:]
     self.pathPlayer(pId)
     self.client.problem.movePathToProblem(pId,self.fullBodyContext, names)
     self.setFullBodyContext()
     return pId
+    
+  def interpolateState(self, stepsize, pathId = 1, robustnessTreshold = 0, filterStates = False, testReachability = True, quasiStatic = False, erasePreviousStates = True):
+    return _interpolateState(self.problemSolver, self.fullBody, stepsize, pathId, robustnessTreshold, filterStates, testReachability, quasiStatic, erasePreviousStates)
        
               

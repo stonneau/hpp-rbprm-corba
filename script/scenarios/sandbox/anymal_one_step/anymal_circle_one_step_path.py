@@ -15,7 +15,7 @@ mu=0.5# coefficient of friction
 # Creating an instance of the helper class, and loading the robot
 rbprmBuilder = Robot ()
 # Define bounds for the root : bounding box of the scenario
-root_bounds =  [-2,2, -2, 2, 0.4, 0.5]
+root_bounds =  [-20,20, -20, 20, 0.4, 0.5]
 rbprmBuilder.setJointBounds ("root_joint", root_bounds)
 
 # The following lines set constraint on the valid configurations:
@@ -25,7 +25,8 @@ for rom in rbprmBuilder.urdfNameRom :
     rbprmBuilder.setAffordanceFilter(rom, ['Support'])
 
 # We also bound the rotations of the torso. (z, y, x)
-rbprmBuilder.boundSO3([-1.7,1.7,-0.1,0.1,-0.1,0.1])
+#~ rbprmBuilder.boundSO3([-1.7,1.7,-0.1,0.1,-0.1,0.1])
+rbprmBuilder.boundSO3([-3,3,-3.,3.,-3.,-3])
 # Add 6 extraDOF to the problem, used to store the linear velocity and acceleration of the root
 rbprmBuilder.client.robot.setDimensionExtraConfigSpace(extraDof)
 # We set the bounds of this extraDof with velocity and acceleration bounds (expect on z axis)
